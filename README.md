@@ -25,7 +25,7 @@
 2. 工具 → 插件 → 齿轮 → Install Plugin From File…，选择 `full-pdf-translate.xpi`（构建产物在 `.scaffold/build/`）
 3. 打开插件设置：
    - **服务配置**：新建一个服务（如智谱 GLM），填 API Key 和模型，点「测试连接」，然后保存
-   - **翻译引擎**：点「下载引擎」自动下载 pdf2zh_next 便携版（约 1~2 GB，仅首次；Windows 10/11 自带 curl/tar，无需 Python）
+   - **翻译引擎**：点「下载引擎」自动下载 pdf2zh_next 便携版（约 520 MB，仅首次；Windows 10/11 自带 curl/tar，无需 Python；直连 GitHub 失败会自动尝试镜像）
 4. 选中条目右键 →「翻译整篇 PDF（双语）」
 
 > 提示：如果引擎无法启动，多半缺 VC++ 运行库：https://aka.ms/vs/17/release/vc_redist.x64.exe

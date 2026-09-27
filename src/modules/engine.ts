@@ -97,32 +97,40 @@ async function resolveDownloadUrl(): Promise<string> {
   return FALLBACK_DOWNLOAD_URL;
 }
 
-export async function downloadEngine(
-  onProgress?: DownloadProgress,
-): Promise<string> {
-  if (!Zotero.isWin) {
-    throw new Error(getString("engine-need-manual"));
-  }
-  onProgress?.(null, getString("engine-resolving"));
-  let url = await resolveDownloadUrl();
-  const prefix = String(getPref("downloadURLPrefix") || "")
-    .trim()
-    .replace(/\/+$/, "");
-  if (prefix) url = `${prefix}/${url}`;
+// Tried in order after a failed direct download; gh-proxy.com measured
+// ~3 MB/s from mainland China while direct GitHub gave ~17 KB/s.
+const MIRROR_PREFIXES = ["https://gh-proxy.com/", "https://ghproxy.net/"];
 
-  await IOUtils.makeDirectory(getEngineDataDir(), { createAncestors: true });
-  const zipPath = getZipPath();
+// --speed-time/--speed-limit abort a stalled transfer (<10 KB/s for 30s)
+// instead of hanging forever.
+const CURL_FLAGS = [
+  "-fL",
+  "--retry",
+  "3",
+  "--connect-timeout",
+  "30",
+  "--speed-time",
+  "30",
+  "--speed-limit",
+  "10240",
+  "--progress-bar",
+];
+
+async function downloadZip(
+  url: string,
+  zipPath: string,
+  onProgress?: DownloadProgress,
+): Promise<void> {
   try {
     await IOUtils.remove(zipPath);
   } catch {
     // nothing to clean
   }
-
   onProgress?.(0, getString("engine-downloading"));
   let lastPct = 0;
   const download = await runSubprocess({
     command: "C:\\Windows\\System32\\curl.exe",
-    arguments: ["-fL", "--retry", "3", "--progress-bar", "-o", zipPath, url],
+    arguments: [...CURL_FLAGS, "-o", zipPath, url],
     workdir: getEngineDataDir(),
     onStdout: (chunk) => {
       const matches = [...chunk.matchAll(/(\d+(?:\.\d+)?)%/g)];
@@ -137,9 +145,43 @@ export async function downloadEngine(
   });
   if (download.exitCode !== 0) {
     throw new Error(
-      `${getString("engine-download-failed")} (curl exit ${download.exitCode})\n${download.stdout.slice(-400)}`,
+      `${getString("engine-download-failed")} (curl exit ${download.exitCode}) ${url.slice(0, 100)}\n${download.stdout.slice(-300)}`,
     );
   }
+}
+
+export async function downloadEngine(
+  onProgress?: DownloadProgress,
+): Promise<string> {
+  if (!Zotero.isWin) {
+    throw new Error(getString("engine-need-manual"));
+  }
+  onProgress?.(null, getString("engine-resolving"));
+  const origin = await resolveDownloadUrl();
+  const manual = String(getPref("downloadURLPrefix") || "")
+    .trim()
+    .replace(/\/+$/, "");
+  const candidates: string[] = [];
+  if (manual) candidates.push(`${manual}/${origin}`);
+  candidates.push(origin);
+  for (const mirror of MIRROR_PREFIXES) {
+    candidates.push(`${mirror.replace(/\/+$/, "")}/${origin}`);
+  }
+
+  await IOUtils.makeDirectory(getEngineDataDir(), { createAncestors: true });
+  const zipPath = getZipPath();
+  let lastError: any = null;
+  for (const url of candidates) {
+    try {
+      await downloadZip(url, zipPath, onProgress);
+      lastError = null;
+      break;
+    } catch (e: any) {
+      lastError = e;
+      Zotero.logError(e);
+    }
+  }
+  if (lastError) throw lastError;
 
   onProgress?.(null, getString("engine-extracting"));
   const unzipDir = getEngineUnzipDir();
