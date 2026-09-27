@@ -1,33 +1,227 @@
 <linkset>
   <html:link rel="localization" href="__addonRef__-preferences.ftl" />
 </linkset>
-<groupbox
+<vbox
+  id="zotero-prefpane-__addonRef__"
   onload="Zotero.__addonInstance__.hooks.onPrefsEvent('load', { window })"
 >
-  <label><html:h2 data-l10n-id="pref-title"></html:h2></label>
-  <checkbox
-    id="zotero-prefpane-__addonRef__-enable"
-    preference="enable"
-    data-l10n-id="pref-enable"
-  />
-  <hbox>
+  <groupbox>
+    <label><html:h2 data-l10n-id="pref-section-profiles"></html:h2></label>
+    <hbox align="center">
+      <label data-l10n-id="pref-active-profile"></label>
+      <menulist id="__addonRef__-active-profile" style="min-width: 240px">
+        <menupopup></menupopup>
+      </menulist>
+    </hbox>
+    <richlistbox id="__addonRef__-profile-list" height="130px"></richlistbox>
+    <hbox>
+      <button
+        id="__addonRef__-profile-new"
+        data-l10n-id="pref-profile-new"
+      ></button>
+      <button
+        id="__addonRef__-profile-delete"
+        data-l10n-id="pref-profile-delete"
+      ></button>
+    </hbox>
+    <vbox>
+      <hbox align="center">
+        <label data-l10n-id="pref-profile-name" style="min-width: 9em"></label>
+        <html:input
+          id="__addonRef__-profile-name"
+          type="text"
+          style="flex: 1"
+        ></html:input>
+      </hbox>
+      <hbox align="center">
+        <label
+          data-l10n-id="pref-profile-preset"
+          style="min-width: 9em"
+        ></label>
+        <menulist id="__addonRef__-profile-preset" style="min-width: 240px">
+          <menupopup></menupopup>
+        </menulist>
+      </hbox>
+      <hbox align="center">
+        <label
+          data-l10n-id="pref-profile-baseurl"
+          style="min-width: 9em"
+        ></label>
+        <html:input
+          id="__addonRef__-profile-baseurl"
+          type="text"
+          style="flex: 1"
+          placeholder="https://api.example.com/v1"
+        ></html:input>
+      </hbox>
+      <hbox align="center">
+        <label data-l10n-id="pref-profile-key" style="min-width: 9em"></label>
+        <html:input
+          id="__addonRef__-profile-key"
+          type="password"
+          style="flex: 1"
+        ></html:input>
+      </hbox>
+      <hbox align="center">
+        <label data-l10n-id="pref-profile-model" style="min-width: 9em"></label>
+        <html:input
+          id="__addonRef__-profile-model"
+          type="text"
+          style="flex: 1"
+        ></html:input>
+      </hbox>
+      <hbox align="center">
+        <button
+          id="__addonRef__-profile-save"
+          data-l10n-id="pref-profile-save"
+        ></button>
+        <button
+          id="__addonRef__-profile-test"
+          data-l10n-id="pref-profile-test"
+        ></button>
+        <label id="__addonRef__-profile-test-result" flex="1"></label>
+      </hbox>
+    </vbox>
+  </groupbox>
+
+  <groupbox>
+    <label><html:h2 data-l10n-id="pref-section-mode"></html:h2></label>
+    <radiogroup id="__addonRef__-mode">
+      <radio value="fast" data-l10n-id="pref-mode-fast"></radio>
+      <radio value="precise" data-l10n-id="pref-mode-precise"></radio>
+      <radio value="scan" data-l10n-id="pref-mode-scan"></radio>
+      <radio value="custom" data-l10n-id="pref-mode-custom"></radio>
+    </radiogroup>
+    <checkbox
+      id="__addonRef__-no-glossary"
+      data-l10n-id="pref-no-glossary"
+    ></checkbox>
+    <checkbox
+      id="__addonRef__-watermark"
+      data-l10n-id="pref-watermark"
+    ></checkbox>
+    <checkbox
+      id="__addonRef__-autoopen"
+      data-l10n-id="pref-autoopen"
+    ></checkbox>
+  </groupbox>
+
+  <groupbox>
+    <label><html:h2 data-l10n-id="pref-section-advanced"></html:h2></label>
+    <hbox align="center">
+      <label data-l10n-id="pref-lang-in" style="min-width: 9em"></label>
+      <html:input
+        id="__addonRef__-lang-in"
+        type="text"
+        style="width: 9em"
+      ></html:input>
+      <label data-l10n-id="pref-lang-out" style="min-width: 9em"></label>
+      <html:input
+        id="__addonRef__-lang-out"
+        type="text"
+        style="width: 9em"
+      ></html:input>
+    </hbox>
+    <hbox align="center">
+      <label data-l10n-id="pref-output" style="min-width: 9em"></label>
+      <menulist id="__addonRef__-output" style="min-width: 240px">
+        <menupopup>
+          <menuitem value="dual" data-l10n-id="pref-output-dual"></menuitem>
+          <menuitem value="mono" data-l10n-id="pref-output-mono"></menuitem>
+          <menuitem value="both" data-l10n-id="pref-output-both"></menuitem>
+        </menupopup>
+      </menulist>
+    </hbox>
+    <hbox align="center">
+      <label data-l10n-id="pref-qps" style="min-width: 9em"></label>
+      <html:input
+        id="__addonRef__-qps"
+        type="number"
+        min="1"
+        step="1"
+        style="width: 6em"
+      ></html:input>
+      <label data-l10n-id="pref-pool" style="min-width: 9em"></label>
+      <html:input
+        id="__addonRef__-pool"
+        type="number"
+        min="1"
+        step="1"
+        style="width: 6em"
+      ></html:input>
+    </hbox>
+    <hbox align="center">
+      <label data-l10n-id="pref-pages" style="min-width: 9em"></label>
+      <html:input
+        id="__addonRef__-pages"
+        type="text"
+        placeholder="1-5, 8"
+        style="width: 14em"
+      ></html:input>
+    </hbox>
+    <hbox align="center">
+      <label data-l10n-id="pref-ocr" style="min-width: 9em"></label>
+      <menulist id="__addonRef__-ocr" style="min-width: 240px">
+        <menupopup>
+          <menuitem value="off" data-l10n-id="pref-ocr-off"></menuitem>
+          <menuitem value="auto" data-l10n-id="pref-ocr-auto"></menuitem>
+          <menuitem value="on" data-l10n-id="pref-ocr-on"></menuitem>
+        </menupopup>
+      </menulist>
+    </hbox>
+    <hbox align="center">
+      <label data-l10n-id="pref-glossary" style="min-width: 9em"></label>
+      <html:input
+        id="__addonRef__-glossary"
+        type="text"
+        style="flex: 1"
+      ></html:input>
+      <button
+        id="__addonRef__-glossary-browse"
+        data-l10n-id="pref-glossary-browse"
+      ></button>
+    </hbox>
+    <vbox>
+      <label data-l10n-id="pref-prompt"></label>
+      <html:textarea
+        id="__addonRef__-prompt"
+        rows="4"
+        style="width: 100%"
+      ></html:textarea>
+    </vbox>
+  </groupbox>
+
+  <groupbox>
+    <label><html:h2 data-l10n-id="pref-section-engine"></html:h2></label>
+    <label id="__addonRef__-engine-status"></label>
+    <hbox>
+      <button
+        id="__addonRef__-engine-download"
+        data-l10n-id="pref-engine-download"
+      ></button>
+      <button
+        id="__addonRef__-engine-browse"
+        data-l10n-id="pref-engine-browse"
+      ></button>
+      <button
+        id="__addonRef__-engine-reset"
+        data-l10n-id="pref-engine-reset"
+      ></button>
+    </hbox>
+    <hbox align="center">
+      <label data-l10n-id="pref-download-prefix" style="min-width: 9em"></label>
+      <html:input
+        id="__addonRef__-download-prefix"
+        type="text"
+        style="flex: 1"
+      ></html:input>
+    </hbox>
+  </groupbox>
+
+  <vbox>
     <html:label
-      for="zotero-prefpane-__addonRef__-input"
-      data-l10n-id="pref-input"
+      data-l10n-id="pref-help"
+      data-l10n-args='{"time": "__buildTime__","name": "__addonName__","version": "__buildVersion__"}'
     ></html:label>
-    <html:input
-      type="text"
-      id="zotero-prefpane-__addonRef__-input"
-      preference="input"
-    ></html:input>
-  </hbox>
-  <hbox class="virtualized-table-container" flex="1" height="300px">
-    <html:div id="__addonRef__-table-container" />
-  </hbox>
-</groupbox>
-<vbox>
-  <html:label
-    data-l10n-id="pref-help"
-    data-l10n-args='{"time": "__buildTime__","name": "__addonName__","version":"__buildVersion__"}'
-  ></html:label>
+  </vbox>
 </vbox>

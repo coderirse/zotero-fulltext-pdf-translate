@@ -7,8 +7,23 @@
 declare namespace _ZoteroTypes {
   interface Prefs {
     PluginPrefsMap: {
-      "enable": boolean;
-      "input": string;
+      "profiles": string;
+      "activeProfileId": string;
+      "mode": string;
+      "langIn": string;
+      "langOut": string;
+      "output": string;
+      "pages": string;
+      "qps": number;
+      "poolMaxWorkers": number;
+      "noAutoExtractGlossary": boolean;
+      "ocrWorkaround": string;
+      "customSystemPrompt": string;
+      "glossaryFile": string;
+      "watermark": boolean;
+      "enginePath": string;
+      "downloadURLPrefix": string;
+      "autoOpen": boolean;
     };
   }
 }

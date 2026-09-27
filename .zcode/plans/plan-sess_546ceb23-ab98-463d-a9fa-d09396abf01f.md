@@ -5,12 +5,14 @@
 **难点不在插件壳，而在"保留版面/公式/表格的 PDF 翻译引擎"**——它依赖本地版面分析 ML 模型，纯 JS 插件无法实现。因此：引擎 100% 复用开源，插件全新开发。
 
 **引擎选型（已核实 2026-09 现状）：pdf2zh_next**（PDFMathTranslate-next，BabelDOC 内核，AGPL-3.0，活跃维护）
+
 - 任意 OpenAI 兼容端点：`--openai --openai-base-url / --openai-api-key / --openai-model`，通用引擎 `--openaicompatible`
 - 默认同时输出 **单语 PDF + 双语(dual) PDF**，保留公式/表格/版面
 - 支持 `PDF2ZH_*` 环境变量传密钥（不进命令行）、`--watermark-output-mode no_watermark`（⚠ 默认有水印必须显式关）、`--pages`、`--qps`、`--pool-max-workers`、`--custom-system-prompt`、`--glossaries`、翻译缓存（重试成本低）
 - Windows 便携版：`pdf2zh-*-with-assets-win64.zip`（发布于 Byaidu/PDFMathTranslate releases，内含 `pdf2zh_next.exe`，自带字体+版面模型，**免 Python**）
 
 **现有插件均不满足需求，故新建：**
+
 - guaguastandup/zotero-pdf2zh（6.9k★）：功能最全，但要手动装 Python 3.12+uv 后端且保持终端开启；项目正在重写、v4 已停止答疑 → 可先装来应急用
 - study-233/zotero-pdf2zh-pro（2★/6 周）：带一键安装器但太新、不可托付
 - doc2x 官方插件 / 沉浸式翻译 / FanyiPaiban / MagicZotero：闭源或付费云服务
@@ -24,6 +26,7 @@
 - 名称/ID：开发期定，需避开 windingwind/zotero-pdf-translate 重名（建议如 `zotero-fulltext-pdf-translate`）
 
 ### 功能清单
+
 1. **服务配置 profiles**（可存多套、随时切换）：预设服务一键填好 base URL——智谱 GLM、DeepSeek、阿里 Qwen/DashScope、Kimi（走 OpenAICompatible）、SiliconFlow、OpenAI、Gemini、Ollama 本地、自定义 OpenAI 兼容；每套含 base URL + API Key + 模型名（可拉取模型列表）+ "测试连接"按钮
 2. **预设模式**（一键切换的参数包，开箱即用）：
    - ⚡ 快速预览：快模型 + 高并发（qps 8 / pool 16）+ 双语 PDF
@@ -51,6 +54,7 @@ addon/                manifest.json、prefs.js(默认值)、locale/zh-CN|en-US/*
 ```
 
 子进程调用（API 已核实自 Zotero/Gecko 源码）：
+
 - `ChromeUtils.defineESModuleGetters(window, { Subprocess: "resource://gre/modules/Subprocess.sys.mjs" })`
 - `Subprocess.call({ command: exe绝对路径, arguments: [数组传参避免引号问题], environment: { PDF2ZH_OPENAI_API_KEY... }, environmentAppend: true, workdir, stderr: "stdout" })`
 - 循环 `await proc.stdout.readString()` 解析进度；`await proc.wait()` 后检查 exitCode
@@ -69,11 +73,13 @@ addon/                manifest.json、prefs.js(默认值)、locale/zh-CN|en-US/*
 - **M5（1~2 天）打磨发布**：中英 i18n、README（中文为主）、打包 XPI、GitHub Release + update.json
 
 **风险与对策**
+
 - AGPL-3.0（引擎）：插件同样以 AGPL 开源即可；不分发引擎二进制，只引导下载官方 zip（自用无任何限制）
 - 引擎 zip 较大（含模型约 1~2GB）：支持镜像/手动导入，一次下载长期使用
 - `pdf2zh_next.exe` 的发布位置在 v1 仓库 releases（官方文档指路）：M2 时核实最新版本，下载地址做成可配置
 - 扫描件弱：v1 仅 OCR workaround 开关（已确认够用）；Word/Markdown 导出 v1 不做，v2 再评估（MinerU 前置解析）
 
 ## 五、开工动作
+
 1. 初始化 git 仓库 + 脚手架（M0）
 2. 可选并行：先安装 guaguastandup/zotero-pdf2zh 配上自己的 key 应急使用
