@@ -12,6 +12,7 @@ export interface TranslationOutputs {
   logPath: string;
 }
 
+// eslint-disable-next-line no-control-regex -- strips ANSI escape codes from engine output
 const ANSI_RE = /\x1b\[[0-9;]*[A-Za-z]/g;
 
 function tail(text: string, length: number): string {
