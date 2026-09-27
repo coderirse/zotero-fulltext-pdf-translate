@@ -1,5 +1,4 @@
 import { config } from "../package.json";
-import { ColumnOptions, DialogHelper } from "zotero-plugin-toolkit";
 import hooks from "./hooks";
 import { createZToolkit } from "./utils/ztoolkit";
 
@@ -16,10 +15,10 @@ class Addon {
     };
     prefs?: {
       window: Window;
-      columns: Array<ColumnOptions>;
-      rows: Array<{ [dataKey: string]: string }>;
     };
-    dialog?: DialogHelper;
+    menuCleanups: Array<() => void>;
+    // The running pdf2zh_next process, so it can be killed on shutdown.
+    currentProc: { kill(): void } | null;
   };
   // Lifecycle hooks
   public hooks: typeof hooks;
@@ -33,6 +32,8 @@ class Addon {
       env: __env__,
       initialized: false,
       ztoolkit: createZToolkit(),
+      menuCleanups: [],
+      currentProc: null,
     };
     this.hooks = hooks;
     this.api = {};
