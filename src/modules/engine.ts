@@ -6,10 +6,38 @@ import { runSubprocess } from "../utils/subprocess";
 const RELEASE_API_URL =
   "https://api.github.com/repos/PDFMathTranslate/PDFMathTranslate/releases/latest";
 // Kept as a fallback when the GitHub API is unreachable; the API path
-// above always prefers the newest release.
+// above always prefers the newest release. The published Windows zip
+// bundles the pdf2zh v1 engine (embedded Python runtime + fonts +
+// layout model), so it works fully offline after extraction.
 const FALLBACK_DOWNLOAD_URL =
   "https://github.com/PDFMathTranslate/PDFMathTranslate/releases/download/v1.9.11/pdf2zh-v1.9.11-with-assets-win64.zip";
-const ENGINE_EXE_NAME = "pdf2zh_next.exe";
+
+// Tried in order after a failed direct download; gh-proxy.com measured
+// ~3 MB/s from mainland China while direct GitHub gave ~17 KB/s.
+const MIRROR_PREFIXES = ["https://gh-proxy.com/", "https://ghproxy.net/"];
+
+// --speed-time/--speed-limit abort a stalled transfer (<10 KB/s for 30s)
+// instead of hanging forever.
+const CURL_FLAGS = [
+  "-fL",
+  "--retry",
+  "3",
+  "--connect-timeout",
+  "30",
+  "--speed-time",
+  "30",
+  "--speed-limit",
+  "10240",
+  "--progress-bar",
+];
+
+export interface EngineInfo {
+  path: string;
+  // "next" = pdf2zh_next.exe (v2, BabelDOC kernel, installed manually e.g.
+  // via `uv tool install pdf2zh-next`); "v1" = pdf2zh.exe from the
+  // auto-downloaded release zip.
+  kind: "next" | "v1";
+}
 
 export type DownloadProgress = (pct: number | null, message: string) => void;
 
@@ -25,7 +53,14 @@ function getZipPath(): string {
   return PathUtils.join(getEngineDataDir(), "engine.zip");
 }
 
-async function findExeRecursive(dir: string): Promise<string | null> {
+function kindOf(exePath: string): EngineInfo["kind"] {
+  return exePath.toLowerCase().endsWith("pdf2zh_next.exe") ? "next" : "v1";
+}
+
+async function findExeRecursive(
+  dir: string,
+  exeName: string,
+): Promise<string | null> {
   let entries: string[];
   try {
     entries = await IOUtils.getChildren(dir);
@@ -36,9 +71,9 @@ async function findExeRecursive(dir: string): Promise<string | null> {
     try {
       const stat = await IOUtils.stat(entry);
       if (stat.type === "directory") {
-        const found = await findExeRecursive(entry);
+        const found = await findExeRecursive(entry, exeName);
         if (found) return found;
-      } else if (entry.endsWith(ENGINE_EXE_NAME)) {
+      } else if (entry.toLowerCase().endsWith(exeName)) {
         return entry;
       }
     } catch {
@@ -48,29 +83,36 @@ async function findExeRecursive(dir: string): Promise<string | null> {
   return null;
 }
 
-export async function getManualEnginePath(): Promise<string | null> {
+export async function getManualEngineInfo(): Promise<EngineInfo | null> {
   const p = String(getPref("enginePath") || "").trim();
   if (!p) return null;
   try {
-    return (await IOUtils.exists(p)) ? p : null;
+    if (!(await IOUtils.exists(p))) return null;
   } catch {
     return null;
   }
+  return { path: p, kind: kindOf(p) };
 }
 
-export async function findManagedEngine(): Promise<string | null> {
-  return findExeRecursive(getEngineUnzipDir());
+export async function findManagedEngine(): Promise<EngineInfo | null> {
+  const dir = getEngineUnzipDir();
+  // Prefer the v2 engine if the user dropped one into the engine dir.
+  const next = await findExeRecursive(dir, "pdf2zh_next.exe");
+  if (next) return { path: next, kind: "next" };
+  const v1 = await findExeRecursive(dir, "pdf2zh.exe");
+  if (v1) return { path: v1, kind: "v1" };
+  return null;
 }
 
-export async function detectEngine(): Promise<string | null> {
-  const manual = await getManualEnginePath();
+export async function detectEngine(): Promise<EngineInfo | null> {
+  const manual = await getManualEngineInfo();
   if (manual) return manual;
   return findManagedEngine();
 }
 
 export async function ensureEngine(
   onProgress?: DownloadProgress,
-): Promise<string> {
+): Promise<EngineInfo> {
   const found = await detectEngine();
   if (found) return found;
   if (!Zotero.isWin) {
@@ -96,25 +138,6 @@ async function resolveDownloadUrl(): Promise<string> {
   }
   return FALLBACK_DOWNLOAD_URL;
 }
-
-// Tried in order after a failed direct download; gh-proxy.com measured
-// ~3 MB/s from mainland China while direct GitHub gave ~17 KB/s.
-const MIRROR_PREFIXES = ["https://gh-proxy.com/", "https://ghproxy.net/"];
-
-// --speed-time/--speed-limit abort a stalled transfer (<10 KB/s for 30s)
-// instead of hanging forever.
-const CURL_FLAGS = [
-  "-fL",
-  "--retry",
-  "3",
-  "--connect-timeout",
-  "30",
-  "--speed-time",
-  "30",
-  "--speed-limit",
-  "10240",
-  "--progress-bar",
-];
 
 async function downloadZip(
   url: string,
@@ -152,7 +175,7 @@ async function downloadZip(
 
 export async function downloadEngine(
   onProgress?: DownloadProgress,
-): Promise<string> {
+): Promise<EngineInfo> {
   if (!Zotero.isWin) {
     throw new Error(getString("engine-need-manual"));
   }
@@ -247,7 +270,7 @@ export function browseForEngine(win: Window): Promise<string | null> {
   return pickFile(
     win,
     getString("pref-engine-browse"),
-    "pdf2zh_next.exe",
+    "pdf2zh.exe / pdf2zh_next.exe",
     "*.exe",
   );
 }

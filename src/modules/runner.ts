@@ -3,6 +3,7 @@ import { getString } from "../utils/locale";
 import { getPref } from "../utils/prefs";
 import { spawnSubprocess } from "../utils/subprocess";
 import { getActiveProfile } from "./profiles";
+import type { EngineInfo } from "./engine";
 
 export interface TranslationOutputs {
   monoPath?: string;
@@ -11,7 +12,6 @@ export interface TranslationOutputs {
   logPath: string;
 }
 
-// eslint-disable-next-line no-control-regex -- strips ANSI escape codes from engine output
 const ANSI_RE = /\x1b\[[0-9;]*[A-Za-z]/g;
 
 function tail(text: string, length: number): string {
@@ -27,9 +27,9 @@ function lastMeaningfulLine(text: string): string {
   return (lines[lines.length - 1] ?? "").slice(-120);
 }
 
-// CLI flags for pdf2zh_next (PDFMathTranslate-next). Secrets travel via
-// PDF2ZH_* env vars only, never the command line.
-function buildArgs(inputFile: string, outDir: string): string[] {
+// pdf2zh_next (v2) CLI flags. Secrets travel via PDF2ZH_* env vars only,
+// never the command line.
+function buildNextArgs(inputFile: string, outDir: string): string[] {
   const args: string[] = [inputFile, "--output", outDir];
   args.push("--lang-in", String(getPref("langIn") || "en"));
   args.push("--lang-out", String(getPref("langOut") || "zh"));
@@ -59,12 +59,46 @@ function buildArgs(inputFile: string, outDir: string): string[] {
   return args;
 }
 
+// pdf2zh v1 CLI flags (the engine inside the auto-downloaded release zip).
+// The classic pipeline is used (no --babeldoc) so output carries no
+// watermark; v1 has no glossary/mono-only/OCR options, so those
+// preferences are ignored for this engine kind.
+async function buildV1Args(
+  inputFile: string,
+  outDir: string,
+  workDir: string,
+): Promise<string[]> {
+  const args: string[] = [
+    inputFile,
+    "--output",
+    outDir,
+    "--lang-in",
+    String(getPref("langIn") || "en"),
+    "--lang-out",
+    String(getPref("langOut") || "zh"),
+    "--service",
+    "openailiked",
+    "--thread",
+    String(Math.max(1, Number(getPref("qps")) || 4)),
+  ];
+  const pages = String(getPref("pages") || "").trim();
+  if (pages) args.push("--pages", pages);
+  const prompt = String(getPref("customSystemPrompt") || "").trim();
+  if (prompt) {
+    // v1 only accepts the custom prompt as a file
+    const promptFile = PathUtils.join(workDir, "prompt.txt");
+    await IOUtils.writeUTF8(promptFile, prompt);
+    args.push("--prompt", promptFile);
+  }
+  return args;
+}
+
 export async function runTranslation(opts: {
-  enginePath: string;
+  engine: EngineInfo;
   filePath: string;
   onStatus?: (status: string) => void;
 }): Promise<TranslationOutputs> {
-  const { enginePath, filePath } = opts;
+  const { engine, filePath } = opts;
   const profile = getActiveProfile();
   if (!profile) throw new Error(getString("no-profile"));
 
@@ -82,22 +116,37 @@ export async function runTranslation(opts: {
   const outDir = PathUtils.join(workDir, "out");
   await IOUtils.makeDirectory(outDir, { createAncestors: true });
 
-  const args = buildArgs(inputFile, outDir);
-  const env = {
-    PDF2ZH_OPENAI: "1",
-    PDF2ZH_OPENAI_BASE_URL: profile.baseUrl.replace(/\/+$/, ""),
-    PDF2ZH_OPENAI_API_KEY: profile.apiKey,
-    PDF2ZH_OPENAI_MODEL: profile.model,
-  };
-  Zotero.debug(`[fullpdf] spawn: ${enginePath} ${args.join(" ")}`);
+  const args =
+    engine.kind === "next"
+      ? buildNextArgs(inputFile, outDir)
+      : await buildV1Args(inputFile, outDir, workDir);
+  // v1's openailiked service reads OPENAILIKED_* from the process
+  // environment; v2 reads PDF2ZH_*.
+  const env: Record<string, string> =
+    engine.kind === "next"
+      ? {
+          PDF2ZH_OPENAI: "1",
+          PDF2ZH_OPENAI_BASE_URL: profile.baseUrl.replace(/\/+$/, ""),
+          PDF2ZH_OPENAI_API_KEY: profile.apiKey,
+          PDF2ZH_OPENAI_MODEL: profile.model,
+        }
+      : {
+          OPENAILIKED_BASE_URL: profile.baseUrl.replace(/\/+$/, ""),
+          OPENAILIKED_API_KEY: profile.apiKey,
+          OPENAILIKED_MODEL: profile.model,
+        };
+  Zotero.debug(
+    `[fullpdf] spawn (${engine.kind}): ${engine.path} ${args.join(" ")}`,
+  );
 
+  const engineDir = engine.path.replace(/[\\/][^\\/]+$/, "");
   let handle;
   try {
     handle = await spawnSubprocess({
-      command: enginePath,
+      command: engine.path,
       arguments: args,
       environment: env,
-      workdir: workDir,
+      workdir: engineDir,
       onStdout: (chunk) => {
         opts.onStatus?.(lastMeaningfulLine(chunk.replace(ANSI_RE, "")));
       },
