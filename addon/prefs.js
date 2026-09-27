@@ -16,3 +16,4 @@ pref("bilingualLayout", "side");
 pref("enginePath", "");
 pref("downloadURLPrefix", "");
 pref("autoOpen", false);
+pref("debugProbe", false);

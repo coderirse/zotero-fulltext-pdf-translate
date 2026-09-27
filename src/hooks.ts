@@ -38,6 +38,118 @@ async function onStartup() {
   );
 
   addon.data.initialized = true;
+
+  void runStartupDiagnostics();
+}
+
+// Writes a pane-loading diagnostic report to the data directory when the
+// debugProbe pref is on. Exercises exactly what the preferences window
+// does (read pane src -> parseXULToFragment) so a failing pane can be
+// diagnosed from the JSON alone.
+async function runStartupDiagnostics(): Promise<void> {
+  try {
+    if (
+      Zotero.Prefs.get(`${addon.data.config.prefsPrefix}.debugProbe`, true) !==
+      true
+    ) {
+      return;
+    }
+    await Zotero.Promise.delay(15000);
+    const result: any = {
+      time: new Date().toISOString(),
+      paneId: prefPaneId,
+      steps: {},
+    };
+    const src = rootURI + "content/preferences.xhtml";
+    let markup: string | null = null;
+    try {
+      markup = Zotero.File.getContentsFromURL(src);
+      result.steps.read = { ok: true, length: markup.length };
+    } catch (e: any) {
+      result.steps.read = {
+        ok: false,
+        error: String(e),
+        stack: String(e?.stack || "").slice(0, 3000),
+      };
+    }
+    if (markup != null) {
+      try {
+        const win = Zotero.getMainWindows()[0];
+        const frag = win.MozXULElement.parseXULToFragment(markup, [
+          "chrome://zotero/locale/zotero.dtd",
+          "chrome://zotero/locale/preferences.dtd",
+        ]);
+        result.steps.parse = { ok: true, childCount: frag.childElementCount };
+      } catch (e: any) {
+        result.steps.parse = {
+          ok: false,
+          error: String(e),
+          stack: String(e?.stack || "").slice(0, 3000),
+        };
+      }
+    }
+
+    // End-to-end: open the real preferences window, click our pane, and
+    // check whether the pane content actually renders.
+    try {
+      const win = Zotero.getMainWindows()[0];
+      const prefsWin: any = win.openDialog(
+        "chrome://zotero/content/preferences/preferences.xhtml",
+        "zotero-prefs",
+        "chrome,titlebar,toolbar=center,resizable",
+      );
+      for (let i = 0; i < 40; i++) {
+        if (prefsWin?.document?.readyState === "complete") break;
+        await Zotero.Promise.delay(500);
+      }
+      await Zotero.Promise.delay(1500);
+      const step: any = {};
+      result.steps.prefsWindow = step;
+      const doc = prefsWin?.document;
+      step.opened = !!doc;
+      const nav = doc?.getElementById("prefs-navigation");
+      step.navFound = !!nav;
+      const item = nav?.querySelector(
+        'richlistitem[value="fullpdf-prefs"]',
+      ) as any;
+      step.paneItemFound = !!item;
+      const errors: string[] = [];
+      if (doc?.defaultView) {
+        doc.defaultView.addEventListener("error", (e: any) =>
+          errors.push("error: " + String(e?.message ?? e).slice(0, 300)),
+        );
+        doc.defaultView.addEventListener("unhandledrejection", (e: any) =>
+          errors.push("rejection: " + String(e?.reason ?? e).slice(0, 300)),
+        );
+      }
+      if (item) {
+        item.click();
+        await Zotero.Promise.delay(5000);
+        step.clicked = true;
+        step.rendered = !!doc.getElementById("zotero-prefpane-fullpdf");
+        step.errors = errors;
+      }
+      try {
+        prefsWin.close();
+      } catch {
+        // ignore
+      }
+    } catch (e: any) {
+      result.steps.prefsWindow = {
+        fatal: String(e),
+        stack: String(e?.stack || "").slice(0, 2000),
+      };
+    }
+
+    const out = PathUtils.join(
+      Zotero.DataDirectory.dir,
+      `${addon.data.config.addonRef}-diagnostics.json`,
+    );
+    await Zotero.File.putContentsAsync(out, JSON.stringify(result, null, 2));
+    Zotero.debug(`[fullpdf] diagnostics written to ${out}`);
+  } catch (e: any) {
+    Zotero.logError(e);
+  }
 }
 
 async function onMainWindowLoad(win: _ZoteroTypes.MainWindow): Promise<void> {
