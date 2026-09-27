@@ -21,6 +21,7 @@ declare namespace _ZoteroTypes {
       "customSystemPrompt": string;
       "glossaryFile": string;
       "watermark": boolean;
+      "bilingualLayout": string;
       "enginePath": string;
       "downloadURLPrefix": string;
       "autoOpen": boolean;

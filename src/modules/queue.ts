@@ -121,7 +121,17 @@ class TranslateQueue {
       const langOut = String(getPref("langOut") || "zh");
       const output = String(getPref("output") || "dual");
       let firstNewId: number | null = null;
-      if (outputs.dualPath && output !== "mono") {
+      // side-by-side (doc2x style) replaces the stacked dual PDF as the
+      // bilingual attachment when available
+      if (outputs.sidePath && output !== "mono") {
+        const att = await attachTranslation({
+          parentItemID: task.parentId,
+          filePath: outputs.sidePath,
+          title: getString("attach-bilingual", { args: { title: task.title } }),
+          fileBaseName: `${task.title}.${langOut}.bilingual`,
+        });
+        firstNewId = firstNewId ?? att.id;
+      } else if (outputs.dualPath && output !== "mono") {
         const att = await attachTranslation({
           parentItemID: task.parentId,
           filePath: outputs.dualPath,

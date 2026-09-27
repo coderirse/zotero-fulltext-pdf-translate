@@ -109,6 +109,21 @@
   <groupbox>
     <label><html:h2 data-l10n-id="pref-section-advanced"></html:h2></label>
     <hbox align="center">
+      <label
+        data-l10n-id="pref-bilingual-layout"
+        style="min-width: 9em"
+      ></label>
+      <menulist id="__addonRef__-bilingual-layout" style="min-width: 240px">
+        <menupopup>
+          <menuitem value="side" data-l10n-id="pref-layout-side"></menuitem>
+          <menuitem
+            value="stacked"
+            data-l10n-id="pref-layout-stacked"
+          ></menuitem>
+        </menupopup>
+      </menulist>
+    </hbox>
+    <hbox align="center">
       <label data-l10n-id="pref-lang-in" style="min-width: 9em"></label>
       <html:input
         id="__addonRef__-lang-in"

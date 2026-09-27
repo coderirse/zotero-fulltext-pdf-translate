@@ -1,13 +1,15 @@
 import { config } from "../../package.json";
 import { getString } from "../utils/locale";
 import { getPref } from "../utils/prefs";
-import { spawnSubprocess } from "../utils/subprocess";
+import { runSubprocess, spawnSubprocess } from "../utils/subprocess";
 import { getActiveProfile } from "./profiles";
-import type { EngineInfo } from "./engine";
+import { getBundledRuntime, type EngineInfo } from "./engine";
 
 export interface TranslationOutputs {
   monoPath?: string;
   dualPath?: string;
+  // doc2x-style side-by-side merge of the original and the mono PDF
+  sidePath?: string;
   workDir: string;
   logPath: string;
 }
@@ -39,7 +41,9 @@ function buildNextArgs(inputFile: string, outDir: string): string[] {
     getPref("watermark") ? "watermarked" : "no_watermark",
   );
   const output = String(getPref("output") || "dual");
-  if (output === "dual") args.push("--no-mono");
+  const layout = String(getPref("bilingualLayout") || "side");
+  // the side-by-side layout needs the mono PDF, so never suppress it
+  if (output === "dual" && layout !== "side") args.push("--no-mono");
   else if (output === "mono") args.push("--no-dual");
   args.push("--qps", String(Math.max(1, Number(getPref("qps")) || 4)));
   args.push(
@@ -191,7 +195,78 @@ export async function runTranslation(opts: {
   if (!outputs.monoPath && !outputs.dualPath) {
     throw new Error(`no output produced\n${logTail}`);
   }
+
+  // doc2x-style side-by-side layout: original page left, translated
+  // page right, merged with the engine's bundled PyMuPDF. Falls back
+  // to the stacked dual PDF when unavailable (e.g. v2 engine).
+  const layout = String(getPref("bilingualLayout") || "side");
+  if (layout === "side" && outputs.monoPath) {
+    try {
+      const sidePath = await mergeSideBySide(
+        engine,
+        inputFile,
+        outputs.monoPath,
+        outDir,
+      );
+      if (sidePath) outputs.sidePath = sidePath;
+    } catch (e: any) {
+      Zotero.logError(e);
+    }
+  }
   return outputs;
+}
+
+// Converts a file:// URL inside the installed plugin directory to a
+// Windows path so it can be passed to external processes.
+function pluginFilePath(rel: string): string {
+  const C: any = (globalThis as any).Components;
+  const uri = C.classes["@mozilla.org/network/io-service;1"]
+    .getService(C.interfaces.nsIIOService)
+    .newURI(rootURI + rel, null, null);
+  return uri.QueryInterface(C.interfaces.nsIFileURL).file.path;
+}
+
+async function mergeSideBySide(
+  engine: EngineInfo,
+  originalPdf: string,
+  monoPdf: string,
+  outDir: string,
+): Promise<string | null> {
+  const runtime = getBundledRuntime(engine);
+  if (!runtime) return null;
+  try {
+    if (!(await IOUtils.exists(runtime.pythonExe))) return null;
+  } catch {
+    return null;
+  }
+  const scriptPath = pluginFilePath("content/side_by_side.py");
+  const outPath = PathUtils.join(outDir, "input-side.pdf");
+  const res = await runSubprocess({
+    command: runtime.pythonExe,
+    arguments: [
+      scriptPath,
+      originalPdf,
+      monoPdf,
+      outPath,
+      runtime.sitePackages,
+    ],
+    workdir: outDir,
+  });
+  let produced = false;
+  try {
+    produced = res.exitCode === 0 && (await IOUtils.exists(outPath));
+  } catch {
+    produced = false;
+  }
+  if (!produced) {
+    Zotero.logError(
+      new Error(
+        `side-by-side merge failed (exit ${res.exitCode}): ${tail(res.stdout, 300)}`,
+      ),
+    );
+    return null;
+  }
+  return outPath;
 }
 
 export async function cleanupWorkDir(workDir: string): Promise<void> {
