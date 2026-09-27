@@ -109,10 +109,10 @@ class TranslateQueue {
 
     let workDir: string | null = null;
     try {
-      const enginePath = await ensureEngine(onProgress);
+      const engine = await ensureEngine(onProgress);
       line(getString("task-start", { args: { title: task.title } }), 15);
       const outputs = await runTranslation({
-        enginePath,
+        engine,
         filePath: task.filePath,
         onStatus: (status) => line(status ? `${base} — ${status}` : base, 55),
       });

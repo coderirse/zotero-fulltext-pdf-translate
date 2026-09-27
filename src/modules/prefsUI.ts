@@ -361,7 +361,7 @@ async function refreshEngineStatus(win: Window): Promise<void> {
     win,
     "engine-status",
     found
-      ? `${getString("pref-engine-ready")}: ${found}`
+      ? `${getString("pref-engine-ready")} [${found.kind === "next" ? "pdf2zh_next" : "pdf2zh v1"}]: ${found.path}`
       : getString("pref-engine-missing"),
   );
 }
@@ -370,7 +370,7 @@ async function downloadEngineUI(win: Window): Promise<void> {
   const btn = $(win, "engine-download");
   btn?.setAttribute("disabled", "true");
   try {
-    const exe = await downloadEngine((pct, message) =>
+    const engine = await downloadEngine((pct, message) =>
       setLabel(
         win,
         "engine-status",
@@ -380,7 +380,7 @@ async function downloadEngineUI(win: Window): Promise<void> {
     setLabel(
       win,
       "engine-status",
-      `${getString("pref-engine-ready")}: ${exe}`,
+      `${getString("pref-engine-ready")} [${engine.kind === "next" ? "pdf2zh_next" : "pdf2zh v1"}]: ${engine.path}`,
       "green",
     );
   } catch (e: any) {
