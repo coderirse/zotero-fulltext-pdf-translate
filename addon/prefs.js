@@ -12,6 +12,7 @@ pref("ocrWorkaround", "off");
 pref("customSystemPrompt", "");
 pref("glossaryFile", "");
 pref("watermark", false);
+pref("bilingualLayout", "side");
 pref("enginePath", "");
 pref("downloadURLPrefix", "");
 pref("autoOpen", false);

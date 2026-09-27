@@ -110,6 +110,19 @@ export async function detectEngine(): Promise<EngineInfo | null> {
   return findManagedEngine();
 }
 
+// The auto-downloaded v1 engine bundles a private Python runtime with
+// PyMuPDF, which the side-by-side bilingual merger reuses.
+export function getBundledRuntime(
+  engine: EngineInfo,
+): { pythonExe: string; sitePackages: string } | null {
+  if (engine.kind !== "v1") return null;
+  const buildDir = engine.path.replace(/[\\/][^\\/]+$/, "");
+  return {
+    pythonExe: PathUtils.join(buildDir, "runtime", "python.exe"),
+    sitePackages: PathUtils.join(buildDir, "site-packages"),
+  };
+}
+
 export async function ensureEngine(
   onProgress?: DownloadProgress,
 ): Promise<EngineInfo> {

@@ -290,6 +290,9 @@ function bindCheck(
 }
 
 function initParamUI(win: Window): void {
+  bindChange(win, "bilingual-layout", (v) =>
+    setPref("bilingualLayout", v || "side"),
+  );
   bindChange(win, "lang-in", (v) => setPref("langIn", v.trim() || "en"));
   bindChange(win, "lang-out", (v) => setPref("langOut", v.trim() || "zh"));
   bindChange(win, "output", (v) => setPref("output", v || "dual"));
@@ -319,6 +322,11 @@ function initParamUI(win: Window): void {
 }
 
 function syncParamInputs(win: Window): void {
+  setValue(
+    win,
+    "bilingual-layout",
+    String(getPref("bilingualLayout") || "side"),
+  );
   setValue(win, "lang-in", String(getPref("langIn") || "en"));
   setValue(win, "lang-out", String(getPref("langOut") || "zh"));
   setValue(win, "output", String(getPref("output") || "dual"));
