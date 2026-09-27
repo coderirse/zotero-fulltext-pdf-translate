@@ -1,8 +1,8 @@
 {
   "name": "zotero-fulltext-pdf-translate",
   "type": "module",
-  "version": "0.1.0",
-  "description": "Translate whole PDFs into layout-preserving bilingual PDFs inside Zotero, with your own LLM API keys. Powered by pdf2zh_next (BabelDOC).",
+  "version": "0.2.0",
+  "description": "Translate whole PDFs into layout-preserving bilingual PDFs inside Zotero, with your own LLM API keys. Powered by pdf2zh (BabelDOC).",
   "config": {
     "addonName": "Full PDF Translate",
     "addonID": "fullpdf-translate@shang.dev",
@@ -12,13 +12,13 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/shang/zotero-fulltext-pdf-translate.git"
+    "url": "git+https://github.com/coderirse/zotero-fulltext-pdf-translate.git"
   },
-  "author": "shang",
+  "author": "coderirse",
   "bugs": {
-    "url": "https://github.com/shang/zotero-fulltext-pdf-translate/issues"
+    "url": "https://github.com/coderirse/zotero-fulltext-pdf-translate/issues"
   },
-  "homepage": "https://github.com/shang/zotero-fulltext-pdf-translate#readme",
+  "homepage": "https://github.com/coderirse/zotero-fulltext-pdf-translate#readme",
   "license": "AGPL-3.0-or-later",
   "scripts": {
     "start": "zotero-plugin serve",
