@@ -163,6 +163,48 @@ async function runStartupDiagnostics(): Promise<void> {
     );
     await Zotero.File.putContentsAsync(out, JSON.stringify(result, null, 2));
     Zotero.debug(`[fullpdf] diagnostics written to ${out}`);
+
+    // Deep probe: run one real end-to-end translation so a pipeline
+    // failure can be diagnosed from the diagnostics JSON alone. Waits
+    // for the queue to drain, then records the resulting attachments.
+    try {
+      const s = new Zotero.Search();
+      s.addCondition("title", "contains", "Bio-inspired adhesive joint");
+      const ids = await s.search();
+      const items = Zotero.Items.get(ids).filter((i: any) =>
+        i.isRegularItem?.(),
+      );
+      result.steps.probeTranslate = { targetFound: items.length };
+      if (items.length) {
+        const before = new Set(
+          items[0].getAttachments().map((id: number) => String(id)),
+        );
+        await translateQueue.addFromItems([items[0]]);
+        // enqueue() returns as soon as tasks are queued; wait for the
+        // queue to drain (15 min cap covers the slowest engine runs).
+        for (let i = 0; i < 180 && translateQueue.isBusy(); i++) {
+          await Zotero.Promise.delay(5000);
+        }
+        await Zotero.Promise.delay(3000);
+        const after = items[0]
+          .getAttachments()
+          .map((id: number) => String(id))
+          .filter((id: string) => !before.has(id));
+        result.steps.probeTranslate.busyAfterWait = translateQueue.isBusy();
+        result.steps.probeTranslate.newAttachmentIDs = after;
+        result.steps.probeTranslate.newAttachments = after.map((id) => {
+          const att = Zotero.Items.get(Number(id));
+          return att ? (att.attachmentFilename ?? att.getDisplayTitle()) : id;
+        });
+      }
+    } catch (e: any) {
+      result.steps.probeTranslate = {
+        ...(result.steps.probeTranslate ?? {}),
+        fatal: String(e),
+      };
+    }
+    await Zotero.File.putContentsAsync(out, JSON.stringify(result, null, 2));
+    Zotero.debug(`[fullpdf] probe diagnostics written to ${out}`);
   } catch (e: any) {
     Zotero.logError(e);
   }

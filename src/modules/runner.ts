@@ -370,6 +370,36 @@ export async function cleanupWorkDir(workDir: string): Promise<void> {
   }
 }
 
+// Keeps the engine log of a failed task: the work dir itself is
+// reclaimed, but that log is usually the only way to diagnose why the
+// engine produced nothing. Stored under <data dir>/fullpdf/logs/, with
+// a small ring buffer so it cannot grow unbounded.
+export async function preserveFailureLog(workDir: string): Promise<void> {
+  try {
+    const logPath = PathUtils.join(workDir, "engine.log");
+    if (!(await IOUtils.exists(logPath))) return;
+    const logsDir = PathUtils.join(
+      Zotero.DataDirectory.dir,
+      config.addonRef,
+      "logs",
+    );
+    await IOUtils.makeDirectory(logsDir, { createAncestors: true });
+    const taskId =
+      workDir
+        .replace(/[\\/]+$/, "")
+        .split(/[\\/]/)
+        .pop() ?? "task";
+    await IOUtils.copy(logPath, PathUtils.join(logsDir, `${taskId}.log`));
+    const all = (await IOUtils.getChildren(logsDir)).sort();
+    while (all.length > 10) {
+      await IOUtils.remove(all[0]);
+      all.shift();
+    }
+  } catch (e: any) {
+    Zotero.logError(e);
+  }
+}
+
 // Removes leftover task work dirs from previous sessions. Only runs at
 // startup, before any task can exist.
 export async function cleanupStaleWorkDirs(): Promise<void> {

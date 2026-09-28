@@ -8,7 +8,7 @@ import {
   collectPdfSourcesFromItems,
   type PdfSource,
 } from "./items";
-import { cleanupWorkDir, runTranslation } from "./runner";
+import { cleanupWorkDir, preserveFailureLog, runTranslation } from "./runner";
 
 interface QueueTask {
   sourceId: number;
@@ -198,6 +198,9 @@ class TranslateQueue {
       }
     } catch (e: any) {
       Zotero.logError(e);
+      // The work dir gets reclaimed below; keep the engine log so the
+      // failure stays diagnosable without Debug Output Logging.
+      if (workDir) await preserveFailureLog(workDir);
       // After stop()/shutdown there is no point showing a failure window:
       // the task did not fail on its own, it was cancelled.
       if (!addon.data.alive) return;
