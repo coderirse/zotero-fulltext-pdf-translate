@@ -18,3 +18,6 @@ logs
 .zcode/
 /full-pdf-translate.xpi
 .tmp*.py
+
+# local AI tooling config (not part of the repo)
+.zcodeignore
