@@ -1,5 +1,3 @@
-startup-begin = Plugin loading…
-startup-finish = Full PDF Translate is ready
 prefs-title = Full PDF Translate
 itemmenu-translate = Translate whole PDF (bilingual)
 collectionmenu-translate = Translate all PDFs in this collection
@@ -17,7 +15,7 @@ engine-extracting = Extracting engine…
 engine-ready = Engine ready
 engine-download-failed = Engine download failed
 engine-extract-failed = Engine extraction failed
-engine-exe-not-found = pdf2zh_next.exe not found after extraction
+engine-exe-not-found = No engine executable found after extraction (expected pdf2zh.exe or pdf2zh_next.exe)
 engine-need-manual = Automatic engine download is Windows-only. Install pdf2zh-next yourself (uv tool install pdf2zh-next) and point the plugin to the executable in settings.
 engine-vc-redist = The engine failed to start, possibly missing the VC++ runtime. Install it from: https://aka.ms/vs/17/release/vc_redist.x64.exe
 no-profile = No translation service configured yet. Add one in the plugin settings first.

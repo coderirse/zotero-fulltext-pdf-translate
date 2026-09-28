@@ -1,5 +1,3 @@
-startup-begin = 插件加载中…
-startup-finish = Full PDF Translate 已就绪
 prefs-title = PDF 全文翻译
 itemmenu-translate = 翻译整篇 PDF（双语）
 collectionmenu-translate = 翻译分类中的所有 PDF
@@ -17,7 +15,7 @@ engine-extracting = 正在解压引擎…
 engine-ready = 引擎已就绪
 engine-download-failed = 引擎下载失败
 engine-extract-failed = 引擎解压失败
-engine-exe-not-found = 解压后未找到 pdf2zh_next.exe
+engine-exe-not-found = 解压后未找到引擎可执行文件（应为 pdf2zh.exe 或 pdf2zh_next.exe）
 engine-need-manual = 当前系统不支持自动下载引擎，请自行安装 pdf2zh-next（uv tool install pdf2zh-next）后在插件设置中指定可执行文件路径
 engine-vc-redist = 引擎无法启动，可能缺少 VC++ 运行库，请安装：https://aka.ms/vs/17/release/vc_redist.x64.exe
 no-profile = 尚未配置翻译服务，请先在插件设置中添加并选择

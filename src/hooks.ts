@@ -3,7 +3,6 @@ import { registerMenus } from "./modules/menus";
 import { registerPrefsScripts } from "./modules/prefsUI";
 import { cleanupStaleWorkDirs } from "./modules/runner";
 import { translateQueue } from "./modules/queue";
-import { createZToolkit } from "./utils/ztoolkit";
 
 // Returned by Zotero.PreferencePanes.register; used to unregister on
 // shutdown as a belt-and-braces complement to Zotero's own cleanup.
@@ -170,18 +169,27 @@ async function runStartupDiagnostics(): Promise<void> {
 }
 
 async function onMainWindowLoad(win: _ZoteroTypes.MainWindow): Promise<void> {
-  addon.data.ztoolkit = createZToolkit();
+  // The toolkit instance is created once in the Addon constructor and
+  // reused: recreating it per window dropped the previous instance on
+  // the floor, so its registrations could never be unregistered.
+  // (No per-window FTL needed: menu labels go through getString(), and
+  // the preferences pane declares its own localization linkset.)
 
-  win.MozXULElement.insertFTLIfNeeded(
-    `${addon.data.config.addonRef}-mainWindow.ftl`,
-  );
-
-  addon.data.menuCleanups.push(registerMenus(win));
+  addon.data.menuCleanups.set(win, registerMenus(win));
 }
 
-function onMainWindowUnload(_win: Window): void {
-  // Menu cleanup happens in onShutdown; the main window going away
-  // always coincides with plugin shutdown in practice.
+function onMainWindowUnload(win: Window): void {
+  // Zotero supports multiple main windows; closing one must not leave
+  // its menu items and listeners behind.
+  const cleanup = addon.data.menuCleanups.get(win);
+  if (cleanup) {
+    try {
+      cleanup();
+    } catch {
+      // best effort
+    }
+    addon.data.menuCleanups.delete(win);
+  }
 }
 
 function onPrefsEvent(type: string, data: { [key: string]: any }) {
@@ -213,14 +221,14 @@ function onShutdown(): void {
   } catch {
     // nothing running
   }
-  for (const cleanup of addon.data.menuCleanups) {
+  for (const cleanup of addon.data.menuCleanups.values()) {
     try {
       cleanup();
     } catch {
       // best effort
     }
   }
-  addon.data.menuCleanups = [];
+  addon.data.menuCleanups.clear();
   ztoolkit.unregisterAll();
   addon.data.alive = false;
   // @ts-expect-error - Plugin instance is not typed

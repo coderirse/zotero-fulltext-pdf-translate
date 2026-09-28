@@ -16,7 +16,9 @@ class Addon {
     prefs?: {
       window: Window;
     };
-    menuCleanups: Array<() => void>;
+    // Per-window menu registrations, so closing one window in a
+    // multi-window session removes exactly that window's menu items.
+    menuCleanups: Map<Window, () => void>;
     // The running pdf2zh_next process, so it can be killed on shutdown.
     currentProc: { kill(): void } | null;
   };
@@ -32,7 +34,7 @@ class Addon {
       env: __env__,
       initialized: false,
       ztoolkit: createZToolkit(),
-      menuCleanups: [],
+      menuCleanups: new Map(),
       currentProc: null,
     };
     this.hooks = hooks;

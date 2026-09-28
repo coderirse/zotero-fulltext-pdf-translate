@@ -1,6 +1,6 @@
 import { config } from "../../package.json";
 import { getString } from "../utils/locale";
-import { getPref, setPref } from "../utils/prefs";
+import { getPref } from "../utils/prefs";
 import { runSubprocess } from "../utils/subprocess";
 
 const RELEASE_API_URL =
@@ -386,7 +386,9 @@ function pickFile(
 export function browseForEngine(win: Window): Promise<string | null> {
   return pickFile(
     win,
-    getString("pref-engine-browse"),
+    // only the .label attribute exists for this message; requesting the
+    // bare value would return the literal key name
+    getString("pref-engine-browse", "label"),
     "pdf2zh.exe / pdf2zh_next.exe",
     "*.exe",
   );

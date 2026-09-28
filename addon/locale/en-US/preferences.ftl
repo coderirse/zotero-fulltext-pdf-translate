@@ -62,13 +62,13 @@ pref-glossary = Glossary CSV
 pref-glossary-browse =
     .label = Browse…
 pref-prompt = Custom translation prompt (system prompt, empty = engine default)
-pref-section-engine = Engine (local, layout/formula preserving; auto-managed, manual pdf2zh_next supported)
+pref-section-engine = Engine (local, layout/formula preserving; auto-managed, manual pdf2zh engines supported)
 pref-engine-ready = Engine ready
-pref-engine-missing = Engine not found. Click "Download engine" or point to an existing pdf2zh_next.exe
+pref-engine-missing = Engine not found. Click "Download engine" or point to an existing pdf2zh.exe / pdf2zh_next.exe
 pref-engine-download =
     .label = Download engine (~520 MB, first time only; mirrors auto-tried)
 pref-engine-browse =
-    .label = Locate existing pdf2zh_next.exe
+    .label = Locate existing engine (pdf2zh.exe / pdf2zh_next.exe)
 pref-engine-reset =
     .label = Clear manual path
 pref-download-prefix = Download mirror prefix (optional, e.g. https://ghproxy.net/)

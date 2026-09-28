@@ -27,6 +27,25 @@ export function registerMenus(win: Window): () => void {
       itemMenu.removeEventListener("popupshowing", onPopupShowing);
       mi.remove();
     });
+
+    // The only exit for a mis-keyed batch or a wrong selection: clears
+    // the queue and kills the running engine. Hidden while idle.
+    const cancelMi = doc.createXULElement("menuitem");
+    cancelMi.id = `${config.addonRef}-itemmenu-cancel`;
+    cancelMi.setAttribute("label", getString("itemmenu-cancel"));
+    cancelMi.addEventListener("command", () => {
+      translateQueue.cancel();
+    });
+    const onPopupShowingCancel = () => {
+      if (translateQueue.isBusy()) cancelMi.removeAttribute("hidden");
+      else cancelMi.setAttribute("hidden", "true");
+    };
+    itemMenu.appendChild(cancelMi);
+    itemMenu.addEventListener("popupshowing", onPopupShowingCancel);
+    cleanups.push(() => {
+      itemMenu.removeEventListener("popupshowing", onPopupShowingCancel);
+      cancelMi.remove();
+    });
   }
 
   const colMenu = doc.getElementById("zotero-collectionmenu");
@@ -38,8 +57,19 @@ export function registerMenus(win: Window): () => void {
       const col = (win as any).ZoteroPane?.getSelectedCollection?.();
       if (col) void translateQueue.addFromCollection(col);
     });
+    // Symmetric with the item menu: only offer collection translation
+    // when a collection is actually selected.
+    const onPopupShowingCol = () => {
+      const col = (win as any).ZoteroPane?.getSelectedCollection?.();
+      if (col) cmi.removeAttribute("hidden");
+      else cmi.setAttribute("hidden", "true");
+    };
     colMenu.appendChild(cmi);
-    cleanups.push(() => cmi.remove());
+    colMenu.addEventListener("popupshowing", onPopupShowingCol);
+    cleanups.push(() => {
+      colMenu.removeEventListener("popupshowing", onPopupShowingCol);
+      cmi.remove();
+    });
   }
 
   return () => {
