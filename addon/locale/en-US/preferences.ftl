@@ -62,7 +62,7 @@ pref-glossary = Glossary CSV
 pref-glossary-browse =
     .label = Browse…
 pref-prompt = Custom translation prompt (system prompt, empty = engine default)
-pref-section-engine = Engine (pdf2zh_next, local, layout/formula preserving)
+pref-section-engine = Engine (local, layout/formula preserving; auto-managed, manual pdf2zh_next supported)
 pref-engine-ready = Engine ready
 pref-engine-missing = Engine not found. Click "Download engine" or point to an existing pdf2zh_next.exe
 pref-engine-download =

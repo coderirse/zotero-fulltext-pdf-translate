@@ -1,7 +1,7 @@
 {
   "name": "zotero-fulltext-pdf-translate",
   "type": "module",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Translate whole PDFs into layout-preserving bilingual PDFs inside Zotero, with your own LLM API keys. Powered by pdf2zh (BabelDOC).",
   "config": {
     "addonName": "Full PDF Translate",
