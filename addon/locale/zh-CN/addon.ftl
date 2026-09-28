@@ -21,3 +21,6 @@ engine-exe-not-found = 解压后未找到 pdf2zh_next.exe
 engine-need-manual = 当前系统不支持自动下载引擎，请自行安装 pdf2zh-next（uv tool install pdf2zh-next）后在插件设置中指定可执行文件路径
 engine-vc-redist = 引擎无法启动，可能缺少 VC++ 运行库，请安装：https://aka.ms/vs/17/release/vc_redist.x64.exe
 no-profile = 尚未配置翻译服务，请先在插件设置中添加并选择
+itemmenu-cancel = 取消翻译任务
+queue-cancelled = 已取消翻译并清空队列
+engine-verifying = 正在校验下载完整性…

@@ -134,7 +134,17 @@ export async function ensureEngine(
   return downloadEngine(onProgress);
 }
 
-async function resolveDownloadUrl(): Promise<string> {
+interface ResolvedAsset {
+  url: string;
+  // "sha256:<hex>" as published by the GitHub release API. Used to verify
+  // the downloaded zip — essential for mirror downloads, where a hostile
+  // or hijacked mirror would otherwise get arbitrary code execution plus
+  // the user's API key. Null when the API is unreachable (fallback URL,
+  // direct TLS to GitHub).
+  digest: string | null;
+}
+
+async function resolveDownloadUrl(): Promise<ResolvedAsset> {
   try {
     const rq = await Zotero.HTTP.request("GET", RELEASE_API_URL, {
       responseType: "json",
@@ -144,12 +154,33 @@ async function resolveDownloadUrl(): Promise<string> {
       (a) =>
         typeof a?.name === "string" && /with-assets-win64\.zip$/i.test(a.name),
     );
-    if (asset?.browser_download_url)
-      return asset.browser_download_url as string;
+    if (asset?.browser_download_url) {
+      return {
+        url: asset.browser_download_url as string,
+        digest:
+          typeof asset.digest === "string" && asset.digest.startsWith("sha256:")
+            ? asset.digest
+            : null,
+      };
+    }
   } catch (e: any) {
     Zotero.logError(e);
   }
-  return FALLBACK_DOWNLOAD_URL;
+  return { url: FALLBACK_DOWNLOAD_URL, digest: null };
+}
+
+async function verifyZipDigest(zipPath: string, digest: string): Promise<void> {
+  const expected = digest.replace(/^sha256:/, "").toLowerCase();
+  const data = await IOUtils.read(zipPath);
+  const hash = await crypto.subtle.digest("SHA-256", data);
+  const hex = [...new Uint8Array(hash)]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  if (hex !== expected) {
+    throw new Error(
+      `engine zip sha256 mismatch: expected ${expected}, got ${hex}`,
+    );
+  }
 }
 
 async function downloadZip(
@@ -186,22 +217,39 @@ async function downloadZip(
   }
 }
 
-export async function downloadEngine(
+// Single-flight: the prefs button and per-task ensureEngine() can both
+// reach for a download at the same time; they share one download instead
+// of writing two 521 MB streams to the same zip path. Later callers do
+// not get progress updates (the first caller's callback wins).
+let downloadInflight: Promise<EngineInfo> | null = null;
+
+export function downloadEngine(
+  onProgress?: DownloadProgress,
+): Promise<EngineInfo> {
+  if (!downloadInflight) {
+    downloadInflight = doDownloadEngine(onProgress).finally(() => {
+      downloadInflight = null;
+    });
+  }
+  return downloadInflight;
+}
+
+async function doDownloadEngine(
   onProgress?: DownloadProgress,
 ): Promise<EngineInfo> {
   if (!Zotero.isWin) {
     throw new Error(getString("engine-need-manual"));
   }
   onProgress?.(null, getString("engine-resolving"));
-  const origin = await resolveDownloadUrl();
+  const resolved = await resolveDownloadUrl();
   const manual = String(getPref("downloadURLPrefix") || "")
     .trim()
     .replace(/\/+$/, "");
   const candidates: string[] = [];
-  if (manual) candidates.push(`${manual}/${origin}`);
-  candidates.push(origin);
+  if (manual) candidates.push(`${manual}/${resolved.url}`);
+  candidates.push(resolved.url);
   for (const mirror of MIRROR_PREFIXES) {
-    candidates.push(`${mirror.replace(/\/+$/, "")}/${origin}`);
+    candidates.push(`${mirror.replace(/\/+$/, "")}/${resolved.url}`);
   }
 
   await IOUtils.makeDirectory(getEngineDataDir(), { createAncestors: true });
@@ -210,11 +258,29 @@ export async function downloadEngine(
   for (const url of candidates) {
     try {
       await downloadZip(url, zipPath, onProgress);
+      if (resolved.digest) {
+        onProgress?.(99, getString("engine-verifying"));
+        await verifyZipDigest(zipPath, resolved.digest);
+      } else {
+        // Fallback path when the release API is unreachable: direct TLS
+        // to GitHub, so the mirror tampering risk does not apply, but
+        // make the skipped check visible in the debug log.
+        Zotero.debug(
+          "[fullpdf] no sha256 digest from release API; skipping zip integrity check",
+        );
+      }
       lastError = null;
       break;
     } catch (e: any) {
       lastError = e;
       Zotero.logError(e);
+      // A corrupt/tampered zip must not survive into the next candidate
+      // or the extraction step.
+      try {
+        await IOUtils.remove(zipPath);
+      } catch {
+        // nothing to clean
+      }
     }
   }
   if (lastError) throw lastError;

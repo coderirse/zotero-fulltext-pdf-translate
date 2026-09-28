@@ -21,3 +21,6 @@ engine-exe-not-found = pdf2zh_next.exe not found after extraction
 engine-need-manual = Automatic engine download is Windows-only. Install pdf2zh-next yourself (uv tool install pdf2zh-next) and point the plugin to the executable in settings.
 engine-vc-redist = The engine failed to start, possibly missing the VC++ runtime. Install it from: https://aka.ms/vs/17/release/vc_redist.x64.exe
 no-profile = No translation service configured yet. Add one in the plugin settings first.
+itemmenu-cancel = Cancel translation tasks
+queue-cancelled = Translation cancelled, queue cleared
+engine-verifying = Verifying download integrity…
