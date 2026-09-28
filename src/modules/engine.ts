@@ -136,17 +136,54 @@ export async function detectEngine(): Promise<EngineInfo | null> {
   return found;
 }
 
-// The auto-downloaded v1 engine bundles a private Python runtime with
-// PyMuPDF, which the side-by-side bilingual merger reuses.
-export function getBundledRuntime(
+// Locates a Python runtime with PyMuPDF for the side-by-side bilingual
+// merger. The auto-downloaded v1 engine bundles a private runtime; the
+// v2 engine (pdf2zh_next) ships none, but a `uv tool install` venv
+// contains PyMuPDF — the exe in ~/.local/bin is only a shim, the venv
+// lives under uv's tool dir (%APPDATA%\uv\tools on Windows). Returns
+// null when no usable runtime is found (the merger then falls back to
+// the stacked dual PDF).
+export async function getBundledRuntime(
   engine: EngineInfo,
-): { pythonExe: string; sitePackages: string } | null {
-  if (engine.kind !== "v1") return null;
+): Promise<{ pythonExe: string; sitePackages: string } | null> {
   const buildDir = engine.path.replace(/[\\/][^\\/]+$/, "");
-  return {
-    pythonExe: PathUtils.join(buildDir, "runtime", "python.exe"),
-    sitePackages: PathUtils.join(buildDir, "site-packages"),
-  };
+  const candidates: { pythonExe: string; sitePackages: string }[] = [];
+  if (engine.kind === "v1") {
+    candidates.push({
+      pythonExe: PathUtils.join(buildDir, "runtime", "python.exe"),
+      sitePackages: PathUtils.join(buildDir, "site-packages"),
+    });
+  } else {
+    const toolDirs: string[] = [];
+    try {
+      // defensive: Services.env is Gecko-internal
+      const appData = (globalThis as any).Services?.env?.get?.("APPDATA");
+      if (appData) toolDirs.push(PathUtils.join(appData, "uv", "tools"));
+    } catch {
+      // no env access (non-Windows): no uv probe possible
+    }
+    for (const name of ["pdf2zh-next", "pdf2zh_next"]) {
+      for (const dir of toolDirs) {
+        candidates.push({
+          pythonExe: PathUtils.join(dir, name, "Scripts", "python.exe"),
+          sitePackages: PathUtils.join(dir, name, "Lib", "site-packages"),
+        });
+      }
+    }
+  }
+  for (const c of candidates) {
+    try {
+      if (
+        (await IOUtils.exists(c.pythonExe)) &&
+        (await IOUtils.exists(PathUtils.join(c.sitePackages, "pymupdf")))
+      ) {
+        return c;
+      }
+    } catch {
+      // unreadable candidate, try the next
+    }
+  }
+  return null;
 }
 
 export async function ensureEngine(

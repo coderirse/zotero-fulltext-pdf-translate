@@ -265,13 +265,8 @@ async function mergeSideBySide(
   outDir: string,
   workDir: string,
 ): Promise<string | null> {
-  const runtime = getBundledRuntime(engine);
+  const runtime = await getBundledRuntime(engine);
   if (!runtime) return null;
-  try {
-    if (!(await IOUtils.exists(runtime.pythonExe))) return null;
-  } catch {
-    return null;
-  }
   // The plugin may be installed as a packed XPI (jar: rootURI), so the
   // script has no disk path: read it through Zotero's URL loader and
   // materialize it in the task temp dir for the bundled Python.
