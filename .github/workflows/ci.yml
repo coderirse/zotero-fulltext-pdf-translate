@@ -15,9 +15,22 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GitHub_TOKEN }}
     steps:
       - name: Setup JS
-        uses: zotero-plugin-dev/workflows/setup-js@main
+        uses: zotero-plugin-dev/workflows/setup-js@6bc4563f443313f6cebd3e425ba02f8929fb8d3f # v-main 2026-09-01
       - name: Run Lint
         run: npm run lint:check
+      - name: Check i18n keys
+        run: node scripts/check-i18n.mjs
+
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run test:unit
 
   build:
     runs-on: ubuntu-latest
@@ -25,7 +38,7 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GitHub_TOKEN }}
     steps:
       - name: Setup JS
-        uses: zotero-plugin-dev/workflows/setup-js@main
+        uses: zotero-plugin-dev/workflows/setup-js@6bc4563f443313f6cebd3e425ba02f8929fb8d3f # v-main 2026-09-01
       - name: Run Build
         run: npm run build
       - name: Upload build result
@@ -40,5 +53,5 @@ jobs:
       - build
     steps:
       - name: Setup JS
-        uses: zotero-plugin-dev/workflows/setup-js@main
+        uses: zotero-plugin-dev/workflows/setup-js@6bc4563f443313f6cebd3e425ba02f8929fb8d3f # v-main 2026-09-01
       - run: npm run test
