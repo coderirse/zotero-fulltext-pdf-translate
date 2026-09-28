@@ -1,6 +1,7 @@
 import { getString, initLocale } from "./utils/locale";
 import { registerMenus } from "./modules/menus";
 import { registerPrefsScripts } from "./modules/prefsUI";
+import { cleanupStaleWorkDirs } from "./modules/runner";
 import { createZToolkit } from "./utils/ztoolkit";
 
 // Returned by Zotero.PreferencePanes.register; used to unregister on
@@ -39,6 +40,7 @@ async function onStartup() {
 
   addon.data.initialized = true;
 
+  void cleanupStaleWorkDirs();
   void runStartupDiagnostics();
 }
 

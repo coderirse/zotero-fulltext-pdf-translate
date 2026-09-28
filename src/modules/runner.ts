@@ -110,9 +110,14 @@ export async function runTranslation(opts: {
   const taskId = `${Date.now().toString(36)}-${Math.random()
     .toString(36)
     .slice(2, 8)}`;
+  // Task work dirs must NOT live under the system temp directory: the
+  // bundled pdf2zh v1 engine deletes input files located inside
+  // tempfile.gettempdir() after translating (high_level.py temp-file
+  // cleanup), which silently broke the side-by-side merge.
   const workDir = PathUtils.join(
-    Zotero.getTempDirectory().path,
+    Zotero.DataDirectory.dir,
     config.addonRef,
+    "tmp",
     taskId,
   );
   await IOUtils.makeDirectory(workDir, { createAncestors: true });
@@ -282,6 +287,19 @@ async function mergeSideBySide(
 export async function cleanupWorkDir(workDir: string): Promise<void> {
   try {
     await IOUtils.remove(workDir, { recursive: true });
+  } catch (e: any) {
+    Zotero.logError(e);
+  }
+}
+
+// Removes leftover task work dirs from previous sessions. Only runs at
+// startup, before any task can exist.
+export async function cleanupStaleWorkDirs(): Promise<void> {
+  const base = PathUtils.join(Zotero.DataDirectory.dir, config.addonRef, "tmp");
+  try {
+    if (await IOUtils.exists(base)) {
+      await IOUtils.remove(base, { recursive: true });
+    }
   } catch (e: any) {
     Zotero.logError(e);
   }
