@@ -70,3 +70,6 @@ pref-engine-kind-v1 =
     .label = pdf2zh v1 (auto-downloaded zip)
 pref-engine-kind-next =
     .label = pdf2zh_next (v2, BabelDOC kernel)
+pref-glossary = Glossary CSV
+pref-engine-browse =
+    .label = Locate existing engine (pdf2zh.exe / pdf2zh_next.exe)

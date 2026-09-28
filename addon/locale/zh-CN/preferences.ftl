@@ -70,3 +70,6 @@ pref-engine-kind-v1 =
     .label = pdf2zh v1（自动下载的压缩包）
 pref-engine-kind-next =
     .label = pdf2zh_next（v2，BabelDOC 内核）
+pref-glossary = 术语表 CSV
+pref-engine-browse =
+    .label = 指定已有引擎（pdf2zh.exe / pdf2zh_next.exe）
