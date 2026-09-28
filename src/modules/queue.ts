@@ -32,6 +32,29 @@ class TranslateQueue {
     await this.enqueue(sources);
   }
 
+  // Clears pending tasks and kills the running engine process. Idempotent:
+  // called from the cancel menu, onShutdown, and (via hooks.stopTranslations)
+  // from bootstrap.js on app quit.
+  stop(): void {
+    this.tasks = [];
+    this.queued.clear();
+    try {
+      addon.data.currentProc?.kill();
+    } catch {
+      // nothing running
+    }
+  }
+
+  cancel(): void {
+    const wasBusy = this.isBusy();
+    this.stop();
+    if (wasBusy) this.flash(getString("queue-cancelled"));
+  }
+
+  isBusy(): boolean {
+    return this.running || this.tasks.length > 0;
+  }
+
   private flash(text: string): void {
     new ztoolkit.ProgressWindow(config.addonName, { closeOnClick: true })
       .createLine({ text, type: "default" })
@@ -39,6 +62,7 @@ class TranslateQueue {
   }
 
   private async enqueue(sources: PdfSource[]): Promise<void> {
+    if (!addon.data.alive) return;
     if (!sources.length) {
       this.flash(getString("no-pdf"));
       return;
@@ -71,10 +95,18 @@ class TranslateQueue {
     if (this.running || !addon.data.alive) return;
     this.running = true;
     try {
-      while (this.tasks.length) {
+      // Re-check alive on every iteration: after stop()/shutdown the loop
+      // must not spawn any further engine processes.
+      while (this.tasks.length && addon.data.alive) {
         const task = this.tasks.shift()!;
-        this.queued.delete(task.sourceId);
-        await this.runTask(task);
+        try {
+          await this.runTask(task);
+        } finally {
+          // The dedup marker must survive the whole run: removing it at
+          // shift time let a re-click queue the same PDF twice while it
+          // was still translating.
+          this.queued.delete(task.sourceId);
+        }
       }
     } finally {
       this.running = false;
@@ -165,6 +197,9 @@ class TranslateQueue {
       }
     } catch (e: any) {
       Zotero.logError(e);
+      // After stop()/shutdown there is no point showing a failure window:
+      // the task did not fail on its own, it was cancelled.
+      if (!addon.data.alive) return;
       line(
         getString("task-failed", { args: { title: task.title } }),
         100,

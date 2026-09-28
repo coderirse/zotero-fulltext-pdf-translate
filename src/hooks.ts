@@ -2,6 +2,7 @@ import { getString, initLocale } from "./utils/locale";
 import { registerMenus } from "./modules/menus";
 import { registerPrefsScripts } from "./modules/prefsUI";
 import { cleanupStaleWorkDirs } from "./modules/runner";
+import { translateQueue } from "./modules/queue";
 import { createZToolkit } from "./utils/ztoolkit";
 
 // Returned by Zotero.PreferencePanes.register; used to unregister on
@@ -189,7 +190,16 @@ function onPrefsEvent(type: string, data: { [key: string]: any }) {
   }
 }
 
+// Minimal teardown used by bootstrap.js even on APP_SHUTDOWN, when the
+// full onShutdown below is skipped: stop the queue and kill the engine
+// process, because Windows does not terminate child processes when the
+// parent exits — quitting Zotero would leave the engine running orphaned.
+function stopTranslations(): void {
+  translateQueue.stop();
+}
+
 function onShutdown(): void {
+  translateQueue.stop();
   if (prefPaneId) {
     try {
       Zotero.PreferencePanes.unregister(prefPaneId);
@@ -220,6 +230,7 @@ function onShutdown(): void {
 export default {
   onStartup,
   onShutdown,
+  stopTranslations,
   onMainWindowLoad,
   onMainWindowUnload,
   onPrefsEvent,

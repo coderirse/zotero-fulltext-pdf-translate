@@ -43,6 +43,14 @@ async function onMainWindowUnload({ window }, reason) {
 }
 
 async function shutdown({ id, version, resourceURI, rootURI }, reason) {
+  // Stop translations even on app quit: onShutdown is skipped for
+  // APP_SHUTDOWN, and Windows does not kill child processes when the
+  // parent exits, so the engine would keep running orphaned.
+  try {
+    Zotero.__addonInstance__?.hooks.stopTranslations();
+  } catch (e) {
+    // best effort during teardown
+  }
   if (reason === APP_SHUTDOWN) {
     return;
   }
