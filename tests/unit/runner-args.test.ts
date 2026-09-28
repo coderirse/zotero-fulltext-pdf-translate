@@ -5,6 +5,8 @@ import {
   buildNextArgs,
   buildV1Args,
   lastMeaningfulLine,
+  parseProgress,
+  pickOutputs,
 } from "../../src/modules/runner";
 
 // Modules under test only touch Zotero globals at call time, so
@@ -146,5 +148,55 @@ describe("buildV1Args (v1 pdf2zh)", function () {
     installGlobals({});
     const args = await buildV1Args("in.pdf", "out", "C:\\work");
     assert.ok(!args.includes("--prompt"));
+  });
+});
+
+describe("parseProgress", function () {
+  it("parses percent form (v1)", function () {
+    assert.equal(parseProgress("Progress: 42%"), 42);
+    assert.equal(parseProgress("7.5%"), 8);
+    assert.equal(parseProgress("100%"), 99);
+  });
+
+  it("parses fraction form (v2 BabelDOC rich lines)", function () {
+    assert.equal(parseProgress("Generate instructions 12/45"), 27);
+    assert.equal(parseProgress("Working: 3/10 pages"), 30);
+  });
+
+  it("ignores timestamp dates like 09/28/26", function () {
+    assert.equal(parseProgress("[09/28/26 21:26:07] starting"), null);
+    assert.equal(parseProgress("[09/28/26] then real progress 3/10"), 30);
+  });
+
+  it("returns null without plausible signals", function () {
+    assert.equal(parseProgress("no progress here"), null);
+    assert.equal(parseProgress("Generate drawing instructions (1/1)"), null);
+    assert.equal(parseProgress(""), null);
+  });
+});
+
+describe("pickOutputs", function () {
+  it("recognizes v1 naming", function () {
+    const out = pickOutputs([
+      "C:/w/out/input-dual.pdf",
+      "C:/w/out/input-mono.pdf",
+      "C:/w/out/engine.log",
+    ]);
+    assert.equal(out.mono, "C:/w/out/input-mono.pdf");
+    assert.equal(out.dual, "C:/w/out/input-dual.pdf");
+  });
+
+  it("recognizes v2 naming (watermark mode + lang in the name)", function () {
+    const out = pickOutputs([
+      "C:/w/out/input.no_watermark.zh.dual.pdf",
+      "C:/w/out/input.no_watermark.zh.mono.pdf",
+      "C:/w/out/input.no_watermark.zh.glossary.csv",
+    ]);
+    assert.equal(out.mono, "C:/w/out/input.no_watermark.zh.mono.pdf");
+    assert.equal(out.dual, "C:/w/out/input.no_watermark.zh.dual.pdf");
+  });
+
+  it("returns empty for unrelated files", function () {
+    assert.deepEqual(pickOutputs(["engine.log", "input.pdf"]), {});
   });
 });

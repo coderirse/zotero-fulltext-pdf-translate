@@ -146,7 +146,8 @@ class TranslateQueue {
       const outputs = await runTranslation({
         engine,
         filePath: task.filePath,
-        onStatus: (status) => line(status ? `${base} — ${status}` : base, 55),
+        onStatus: (status, pct) =>
+          line(status ? `${base} — ${status}` : base, pct ?? 55),
       });
       workDir = outputs.workDir;
 

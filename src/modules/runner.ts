@@ -31,6 +31,48 @@ export function lastMeaningfulLine(text: string): string {
   return (lines[lines.length - 1] ?? "").slice(-120);
 }
 
+// Extracts a progress percentage from an engine output chunk. The v1
+// classic pipeline prints "42%"; v2 (BabelDOC) prints rich "12/45"
+// lines. Timestamps like "09/28/26" are stripped first so the fraction
+// form cannot pick them up. Returns null when no plausible signal.
+export function parseProgress(text: string): number | null {
+  const stripped = text.replace(/\b\d{2}\/\d{2}\/\d{2,4}\b/g, " ");
+  const pcts = [...stripped.matchAll(/(\d{1,3}(?:\.\d+)?)\s*%/g)];
+  const pct = pcts[pcts.length - 1];
+  if (pct) {
+    const v = parseFloat(pct[1]);
+    if (v >= 0 && v <= 100) return Math.min(99, Math.round(v));
+  }
+  let out: number | null = null;
+  for (const m of stripped.matchAll(/\b(\d{1,4})\s*\/\s*(\d{1,4})\b/g)) {
+    const cur = parseInt(m[1], 10);
+    const total = parseInt(m[2], 10);
+    if (total > 1 && cur <= total) {
+      out = Math.min(99, Math.round((cur / total) * 100));
+    }
+  }
+  return out;
+}
+
+// Picks the mono/dual outputs from a directory listing by suffix, so
+// both v1 ("input-mono.pdf", hyphen) and v2
+// ("input.no_watermark.zh.mono.pdf", dots) naming are recognized.
+// Prefers the alphabetically first hit.
+export function pickOutputs(files: string[]): {
+  mono?: string;
+  dual?: string;
+} {
+  const out: { mono?: string; dual?: string } = {};
+  for (const f of [...files].sort()) {
+    const base = f
+      .slice(Math.max(f.lastIndexOf("\\"), f.lastIndexOf("/")) + 1)
+      .toLowerCase();
+    if (!out.mono && /[-.]mono\.pdf$/.test(base)) out.mono = f;
+    else if (!out.dual && /[-.]dual\.pdf$/.test(base)) out.dual = f;
+  }
+  return out;
+}
+
 // pdf2zh_next (v2) CLI flags. Secrets travel via PDF2ZH_* env vars only,
 // never the command line.
 export function buildNextArgs(inputFile: string, outDir: string): string[] {
@@ -102,7 +144,7 @@ export async function buildV1Args(
 export async function runTranslation(opts: {
   engine: EngineInfo;
   filePath: string;
-  onStatus?: (status: string) => void;
+  onStatus?: (status: string, progress?: number) => void;
 }): Promise<TranslationOutputs> {
   const { engine, filePath } = opts;
   const profile = getActiveProfile();
@@ -151,7 +193,7 @@ async function translateWithEngine(
   outDir: string,
   workDir: string,
   profile: ServiceProfile,
-  onStatus?: (status: string) => void,
+  onStatus?: (status: string, progress?: number) => void,
 ): Promise<TranslationOutputs> {
   const args =
     engine.kind === "next"
@@ -184,6 +226,10 @@ async function translateWithEngine(
   let logTail = "";
   let handle;
   try {
+    // Create the log file up front: IOUtils "append" does NOT create a
+    // missing file, so the first streamed chunk would fail with
+    // NS_ERROR_FILE_NOT_FOUND.
+    await IOUtils.writeUTF8(logPath, "");
     handle = await spawnSubprocess({
       command: engine.path,
       arguments: args,
@@ -198,7 +244,10 @@ async function translateWithEngine(
         );
         const clean = chunk.replace(ANSI_RE, "");
         logTail = tail(logTail + clean, 600);
-        onStatus?.(lastMeaningfulLine(clean));
+        onStatus?.(
+          lastMeaningfulLine(clean),
+          parseProgress(clean) ?? undefined,
+        );
       },
     });
   } catch (e: any) {
@@ -217,11 +266,14 @@ async function translateWithEngine(
     throw new Error(`engine exit ${result.exitCode}\n${logTail}`);
   }
 
-  const monoPath = PathUtils.join(outDir, "input-mono.pdf");
-  const dualPath = PathUtils.join(outDir, "input-dual.pdf");
+  // Both engines write into outDir but with different naming: v1 uses
+  // "input-mono.pdf"/"input-dual.pdf", v2 uses
+  // "<input>.<watermark-mode>.<lang>.mono/dual.pdf". Match by suffix so
+  // both are covered.
   try {
-    if (await IOUtils.exists(monoPath)) outputs.monoPath = monoPath;
-    if (await IOUtils.exists(dualPath)) outputs.dualPath = dualPath;
+    const picked = pickOutputs(await IOUtils.getChildren(outDir));
+    if (picked.mono) outputs.monoPath = picked.mono;
+    if (picked.dual) outputs.dualPath = picked.dual;
   } catch (e: any) {
     Zotero.logError(e);
   }
