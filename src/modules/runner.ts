@@ -23,6 +23,7 @@ function tail(text: string, length: number): string {
 
 export function lastMeaningfulLine(text: string): string {
   const lines = text
+    .replace(ANSI_RE, "")
     .replace(/\r\n/g, "\n")
     .replace(/\r/g, "\n")
     .split("\n")

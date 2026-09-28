@@ -1,4 +1,4 @@
-function sanitizeFileBaseName(name: string): string {
+export function sanitizeFileBaseName(name: string): string {
   const cleaned = name
     // eslint-disable-next-line no-control-regex -- strips filesystem-illegal control characters
     .replace(/[\\/:*?"<>|\x00-\x1f]/g, " ")

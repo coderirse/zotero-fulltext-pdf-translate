@@ -2,4 +2,17 @@
 
 import zotero from "@zotero-plugin/eslint-config";
 
-export default zotero();
+export default zotero({
+  overrides: [
+    {
+      // Node CLI scripts (repo tooling), not plugin code
+      files: ["scripts/**/*.mjs"],
+      languageOptions: {
+        globals: {
+          console: "readonly",
+          process: "readonly",
+        },
+      },
+    },
+  ],
+});
