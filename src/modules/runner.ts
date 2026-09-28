@@ -207,8 +207,14 @@ export async function runTranslation(opts: {
         inputFile,
         outputs.monoPath,
         outDir,
+        workDir,
       );
       if (sidePath) outputs.sidePath = sidePath;
+      else {
+        Zotero.debug(
+          "[fullpdf] side-by-side merge unavailable, falling back to stacked dual",
+        );
+      }
     } catch (e: any) {
       Zotero.logError(e);
     }
@@ -216,21 +222,12 @@ export async function runTranslation(opts: {
   return outputs;
 }
 
-// Converts a file:// URL inside the installed plugin directory to a
-// Windows path so it can be passed to external processes.
-function pluginFilePath(rel: string): string {
-  const C: any = (globalThis as any).Components;
-  const uri = C.classes["@mozilla.org/network/io-service;1"]
-    .getService(C.interfaces.nsIIOService)
-    .newURI(rootURI + rel, null, null);
-  return uri.QueryInterface(C.interfaces.nsIFileURL).file.path;
-}
-
 async function mergeSideBySide(
   engine: EngineInfo,
   originalPdf: string,
   monoPdf: string,
   outDir: string,
+  workDir: string,
 ): Promise<string | null> {
   const runtime = getBundledRuntime(engine);
   if (!runtime) return null;
@@ -239,7 +236,20 @@ async function mergeSideBySide(
   } catch {
     return null;
   }
-  const scriptPath = pluginFilePath("content/side_by_side.py");
+  // The plugin may be installed as a packed XPI (jar: rootURI), so the
+  // script has no disk path: read it through Zotero's URL loader and
+  // materialize it in the task temp dir for the bundled Python.
+  let scriptContent: string;
+  try {
+    scriptContent = Zotero.File.getContentsFromURL(
+      rootURI + "content/side_by_side.py",
+    );
+  } catch (e: any) {
+    Zotero.logError(e);
+    return null;
+  }
+  const scriptPath = PathUtils.join(workDir, "side_by_side.py");
+  await IOUtils.writeUTF8(scriptPath, scriptContent);
   const outPath = PathUtils.join(outDir, "input-side.pdf");
   const res = await runSubprocess({
     command: runtime.pythonExe,

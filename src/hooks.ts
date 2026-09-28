@@ -88,6 +88,20 @@ async function runStartupDiagnostics(): Promise<void> {
         };
       }
     }
+    // The side-by-side merger loads this script at translate time; a jar:
+    // install has no disk path, so verify the URL loader can serve it.
+    try {
+      const scriptContent = Zotero.File.getContentsFromURL(
+        rootURI + "content/side_by_side.py",
+      );
+      result.steps.scriptRead = { ok: true, length: scriptContent.length };
+    } catch (e: any) {
+      result.steps.scriptRead = {
+        ok: false,
+        error: String(e),
+        stack: String(e?.stack || "").slice(0, 1500),
+      };
+    }
 
     // End-to-end: open the real preferences window, click our pane, and
     // check whether the pane content actually renders.
