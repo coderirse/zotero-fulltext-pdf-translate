@@ -158,11 +158,12 @@ function renderActiveProfileMenu(win: Window): void {
   ml.appendChild(popup);
   const activeId = String(getPref("activeProfileId") || "");
   const profiles = getProfiles();
+  // Render is read-only: migrating a stale active id happens where the
+  // deletion/creation occurs, never as a side effect of opening the pane.
   if (activeId && profiles.some((p) => p.id === activeId)) {
     ml.value = activeId;
   } else if (profiles.length) {
     ml.value = profiles[0].id;
-    setPref("activeProfileId", profiles[0].id);
   }
 }
 
@@ -190,6 +191,26 @@ function saveProfileFromEditor(win: Window): void {
   if (!name || !baseUrl || !model) {
     win.alert(getString("pref-profile-incomplete"));
     return;
+  }
+  // The API key travels as a Bearer header to this URL; anything that is
+  // not http(s) is a mistake, and plain http sends the key unencrypted
+  // (still allowed for local-only endpoints like Ollama, after a warning).
+  let parsed: URL;
+  try {
+    parsed = new URL(baseUrl);
+  } catch {
+    win.alert(getString("pref-profile-bad-url"));
+    return;
+  }
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+    win.alert(getString("pref-profile-bad-url"));
+    return;
+  }
+  if (
+    parsed.protocol === "http:" &&
+    !/^(localhost|127\.0\.0\.1|\[::1\])$/.test(parsed.hostname)
+  ) {
+    if (!win.confirm(getString("pref-profile-http-warn"))) return;
   }
   const profiles = getProfiles();
   if (editingProfileId) {

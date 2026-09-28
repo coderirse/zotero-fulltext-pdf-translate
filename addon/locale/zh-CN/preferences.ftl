@@ -80,3 +80,5 @@ pref-engine-kind-v1 =
     .label = pdf2zh v1（自动下载的压缩包）
 pref-engine-kind-next =
     .label = pdf2zh_next（v2，BabelDOC 内核）
+pref-profile-bad-url = 服务地址必须是合法的 http(s) 地址
+pref-profile-http-warn = 服务地址使用明文 http，API Key 将未加密传输。仍要继续吗？

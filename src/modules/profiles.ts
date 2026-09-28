@@ -82,8 +82,16 @@ export function getProfiles(): ServiceProfile[] {
   try {
     const list = JSON.parse(raw);
     if (!Array.isArray(list)) return [];
+    // All fields must be strings: a half-corrupted pref would otherwise
+    // surface as a TypeError deep inside runTranslation instead of here.
     return list.filter(
-      (p: any) => p && typeof p.id === "string" && typeof p.name === "string",
+      (p: any) =>
+        p &&
+        typeof p.id === "string" &&
+        typeof p.name === "string" &&
+        typeof p.baseUrl === "string" &&
+        typeof p.apiKey === "string" &&
+        typeof p.model === "string",
     );
   } catch (e: any) {
     Zotero.logError(e);
@@ -98,7 +106,16 @@ export function saveProfiles(profiles: ServiceProfile[]): void {
 export function getActiveProfile(): ServiceProfile | null {
   const id = String(getPref("activeProfileId") || "");
   const profiles = getProfiles();
-  return profiles.find((p) => p.id === id) ?? profiles[0] ?? null;
+  const found = profiles.find((p) => p.id === id);
+  if (found) return found;
+  if (profiles.length) {
+    // Falling back silently could quietly bill a different provider's
+    // key; leave a trace at least.
+    Zotero.debug(
+      `[fullpdf] active profile "${id}" not found; falling back to "${profiles[0].name}"`,
+    );
+  }
+  return profiles[0] ?? null;
 }
 
 export async function testProfile(

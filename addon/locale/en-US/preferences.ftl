@@ -80,3 +80,5 @@ pref-engine-kind-v1 =
     .label = pdf2zh v1 (auto-downloaded zip)
 pref-engine-kind-next =
     .label = pdf2zh_next (v2, BabelDOC kernel)
+pref-profile-bad-url = Base URL must be a valid http(s) address
+pref-profile-http-warn = Base URL uses plain http — the API key would be sent unencrypted. Continue anyway?
