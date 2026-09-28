@@ -17,3 +17,4 @@ pref("enginePath", "");
 pref("downloadURLPrefix", "");
 pref("autoOpen", false);
 pref("debugProbe", false);
+pref("engineKind", "auto");

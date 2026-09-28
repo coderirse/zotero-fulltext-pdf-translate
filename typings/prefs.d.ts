@@ -26,6 +26,7 @@ declare namespace _ZoteroTypes {
       "downloadURLPrefix": string;
       "autoOpen": boolean;
       "debugProbe": boolean;
+      "engineKind": string;
     };
   }
 }

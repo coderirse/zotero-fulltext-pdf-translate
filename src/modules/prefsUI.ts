@@ -6,6 +6,7 @@ import {
   browseForGlossary,
   detectEngine,
   downloadEngine,
+  invalidateEngineCache,
 } from "./engine";
 import {
   PRESET_SERVICES,
@@ -339,6 +340,7 @@ function syncParamInputs(win: Window): void {
   setValue(win, "no-glossary", getPref("noAutoExtractGlossary") === true);
   setValue(win, "watermark", getPref("watermark") === true);
   setValue(win, "autoopen", getPref("autoOpen") === true);
+  setValue(win, "engine-kind", String(getPref("engineKind") || "auto"));
   const rg = $(win, "mode");
   if (rg) rg.value = String(getPref("mode") || "fast");
 }
@@ -356,6 +358,13 @@ function initEngineUI(win: Window): void {
   );
   $(win, "engine-reset")?.addEventListener("command", () => {
     setPref("enginePath", "");
+    invalidateEngineCache();
+    void refreshEngineStatus(win);
+  });
+  bindChange(win, "engine-kind", (v) => {
+    setPref("engineKind", v || "auto");
+    // Same exe can resolve to a different kind when the override changes.
+    invalidateEngineCache();
     void refreshEngineStatus(win);
   });
   bindChange(win, "download-prefix", (v) =>
@@ -407,6 +416,7 @@ async function browseEngineUI(win: Window): Promise<void> {
   const path = await browseForEngine(win);
   if (path) {
     setPref("enginePath", path);
+    invalidateEngineCache();
     await refreshEngineStatus(win);
   }
 }

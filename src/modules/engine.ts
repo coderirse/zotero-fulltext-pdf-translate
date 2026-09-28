@@ -53,8 +53,22 @@ function getZipPath(): string {
   return PathUtils.join(getEngineDataDir(), "engine.zip");
 }
 
-function kindOf(exePath: string): EngineInfo["kind"] {
-  return exePath.toLowerCase().endsWith("pdf2zh_next.exe") ? "next" : "v1";
+// File name alone is unreliable (users rename executables), so "auto"
+// also checks for the runtime/ directory that only the v1 release zip
+// places next to pdf2zh.exe. An explicit engineKind pref overrides both.
+async function detectKind(exePath: string): Promise<EngineInfo["kind"]> {
+  const override = String(getPref("engineKind") || "auto");
+  if (override === "v1" || override === "next") return override;
+  if (exePath.toLowerCase().endsWith("pdf2zh_next.exe")) return "next";
+  const buildDir = exePath.replace(/[\\/][^\\/]+$/, "");
+  try {
+    if (await IOUtils.exists(PathUtils.join(buildDir, "runtime"))) {
+      return "v1";
+    }
+  } catch {
+    // unreadable dir: fall through to the v1 default
+  }
+  return "v1";
 }
 
 async function findExeRecursive(
@@ -91,7 +105,7 @@ export async function getManualEngineInfo(): Promise<EngineInfo | null> {
   } catch {
     return null;
   }
-  return { path: p, kind: kindOf(p) };
+  return { path: p, kind: await detectKind(p) };
 }
 
 export async function findManagedEngine(): Promise<EngineInfo | null> {
@@ -104,10 +118,22 @@ export async function findManagedEngine(): Promise<EngineInfo | null> {
   return null;
 }
 
+// Detection scans the whole engine dir (thousands of files inside
+// site-packages) and would otherwise run twice per task. The result is
+// cached until something known to change it happens: browsing/resetting
+// the manual path, changing the engineKind pref, or downloading.
+let engineCache: EngineInfo | null | undefined;
+
+export function invalidateEngineCache(): void {
+  engineCache = undefined;
+}
+
 export async function detectEngine(): Promise<EngineInfo | null> {
+  if (engineCache !== undefined) return engineCache;
   const manual = await getManualEngineInfo();
-  if (manual) return manual;
-  return findManagedEngine();
+  const found = manual ?? (await findManagedEngine());
+  engineCache = found;
+  return found;
 }
 
 // The auto-downloaded v1 engine bundles a private Python runtime with
@@ -288,21 +314,32 @@ async function doDownloadEngine(
   onProgress?.(null, getString("engine-extracting"));
   const unzipDir = getEngineUnzipDir();
   await IOUtils.makeDirectory(unzipDir, { createAncestors: true });
-  let extract = await runSubprocess({
-    command: "C:\\Windows\\System32\\tar.exe",
-    arguments: ["-xf", zipPath, "-C", unzipDir],
-  });
-  if (extract.exitCode !== 0) {
-    // bsdtar missing/failed: fall back to PowerShell Expand-Archive
+  let extract: Awaited<ReturnType<typeof runSubprocess>> | null = null;
+  try {
+    extract = await runSubprocess({
+      command: "C:\\Windows\\System32\\tar.exe",
+      arguments: ["-xf", zipPath, "-C", unzipDir],
+    });
+  } catch (e: any) {
+    // tar.exe missing (stripped-down Windows): runSubprocess rejects
+    // instead of returning a non-zero exit, so the fallback must be
+    // reachable from here too.
+    Zotero.logError(e);
+  }
+  if (!extract || extract.exitCode !== 0) {
+    // Paths travel via env vars instead of being interpolated into the
+    // command string: PowerShell joins everything after -Command into one
+    // command line, so $args[0]-style positional passing does not work
+    // and quoted paths would be an injection surface.
     extract = await runSubprocess({
       command: "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
       arguments: [
         "-NoProfile",
-        "-ExecutionPolicy",
-        "Bypass",
+        "-NonInteractive",
         "-Command",
-        `Expand-Archive -LiteralPath '${zipPath}' -DestinationPath '${unzipDir}' -Force`,
+        "Expand-Archive -LiteralPath $env:FULLPDF_ZIP -DestinationPath $env:FULLPDF_DEST -Force",
       ],
+      environment: { FULLPDF_ZIP: zipPath, FULLPDF_DEST: unzipDir },
     });
   }
   if (extract.exitCode !== 0) {
@@ -314,6 +351,7 @@ async function doDownloadEngine(
     // cleanup is best-effort
   }
 
+  invalidateEngineCache();
   const exe = await findManagedEngine();
   if (!exe) throw new Error(getString("engine-exe-not-found"));
   onProgress?.(100, getString("engine-ready"));
