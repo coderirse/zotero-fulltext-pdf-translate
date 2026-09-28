@@ -1,6 +1,6 @@
 # Full PDF Translate（PDF 全文翻译）
 
-English | [简体中文](README.md)
+[English](README.en.md) | 简体中文
 
 [![Zotero](https://img.shields.io/badge/Zotero-7%20%7C%208%20%7C%209%20%7C%2010-red?style=flat-square&logo=zotero&logoColor=CC2936)](https://www.zotero.org)
 [![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=flat-square)](LICENSE)
