@@ -13,14 +13,14 @@ Positioning: an open-source, self-hosted alternative to doc2x / Immersive Transl
 
 ## Features
 
-- **Right-click to translate**: select items (or a PDF attachment) → right-click → "Translate whole PDF"; right-click a collection for batch translation, with a sequential queue, progress notifications and retries
-- **doc2x-style side-by-side layout** (on by default): original on the left, translation on the right, merged onto one wide page; switchable back to the engine's stacked layout
-- **Bilingual + translated PDFs**: produced locally by [pdf2zh](https://github.com/PDFMathTranslate/PDFMathTranslate) (with the BabelDOC kernel) — layout, formulas and tables preserved, **no watermark by default**
-- **Bring your own key, multiple service profiles**: built-in presets for Zhipu GLM / DeepSeek / Alibaba Qwen / Kimi / SiliconFlow / OpenAI / Gemini / Ollama, plus any custom OpenAI-compatible endpoint; switch profiles anytime, with a connection test; API keys travel via environment variables, never the command line
+- **Right-click to translate**: select items (or a PDF attachment) → right-click → "Translate whole PDF"; right-click a collection for batch translation, with a sequential queue, progress notifications, retries — and a "Cancel translation tasks" entry while running
+- **doc2x-style side-by-side layout** (on by default): original on the left, translation on the right, merged onto one wide page; switchable back to the engine's stacked layout (supported on both v1 and v2 engines)
+- **Bilingual + translated PDFs**: produced locally by [pdf2zh](https://github.com/PDFMathTranslate/PDFMathTranslate) — layout, formulas and tables preserved, **no watermark by default**
+- **Bring your own key, multiple service profiles**: built-in presets for Zhipu GLM / DeepSeek / Alibaba Qwen / Kimi / SiliconFlow / Xiaomi MiMo / OpenAI / Gemini / Ollama, plus any custom OpenAI-compatible endpoint; switch profiles anytime, with a connection test; API keys travel via environment variables, never the command line
 - **Preset modes (out of the box)**: ⚡ quick preview / 📖 careful reading (auto glossary) / 🗂 scanned PDFs (OCR workaround) / ⚙ custom
 - **Highly customizable**: source/target language, page range, output (bilingual / translated / both), QPS & concurrency, custom system prompt, glossary CSV, watermark toggle, auto-open on finish
 - **Auto re-attach**: results are attached back under the original item, named `Title.zh.bilingual`
-- **Fully managed engine**: the portable engine (~520 MB, no Python needed) is downloaded automatically on first use; downloads fall back to mirrors automatically; an existing engine can be set manually
+- **Two engines, fully managed**: the portable v1 engine (~520 MB, no Python needed) is downloaded automatically on first use, with sha256 integrity verification and automatic mirror fallback; a v2 engine installed via `uv tool install pdf2zh_next` is picked up automatically once you select "pdf2zh_next" as the engine kind in settings; any engine path can also be set manually
 
 ## Installation
 
@@ -69,15 +69,18 @@ Self-diagnostics: set the advanced pref `extensions.zotero.fullpdf.debugProbe` t
 
 Since v0.2.2 the full pipeline has been verified end-to-end in a real environment: Zotero 10.0.3 + Windows 11 + DeepSeek API — a 45-page paper translated into a side-by-side bilingual PDF, and batch collection translation working as expected.
 
+v0.2.4: verified with the v2 engine (BabelDOC kernel) + Xiaomi MiMo — on a formula-dense page, the inline-formula/translated-text overlap seen with v1 disappears under v2, and the translation reads more naturally; the side-by-side layout works on v2 as well.
+
 ## Troubleshooting
 
-| Symptom                                       | Fix                                                                                                                                                                   |
-| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Engine fails to start                         | Install the [VC++ runtime](https://aka.ms/vs/17/release/vc_redist.x64.exe)                                                                                            |
-| Engine download slow / stuck                  | Mirrors are tried automatically; you can also set a mirror prefix in settings (e.g. `https://gh-proxy.com/`)                                                          |
-| Settings pane won't open                      | Set the advanced pref `extensions.zotero.fullpdf.debugProbe` to `true` and restart; `fullpdf-diagnostics.json` appears in the data directory — attach it to the issue |
-| Lots of SSE connection errors in Debug Output | Comes from other plugins (e.g. doc2x-parse reconnecting to its desktop client), unrelated to this one — disable that plugin                                           |
-| Result is still stacked                       | Make sure you are on v0.2.2+ and have **fully restarted Zotero** — without a restart the old code keeps running                                                       |
+| Symptom                                       | Fix                                                                                                                                                                                                                           |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Engine fails to start                         | Install the [VC++ runtime](https://aka.ms/vs/17/release/vc_redist.x64.exe)                                                                                                                                                    |
+| Engine download slow / stuck                  | Mirrors are tried automatically; you can also set a mirror prefix in settings (e.g. `https://gh-proxy.com/`)                                                                                                                  |
+| Settings pane won't open                      | Set the advanced pref `extensions.zotero.fullpdf.debugProbe` to `true` and restart; `fullpdf-diagnostics.json` appears in the data directory — attach it to the issue                                                         |
+| Lots of SSE connection errors in Debug Output | Comes from other plugins (e.g. doc2x-parse reconnecting to its desktop client), unrelated to this one — disable that plugin                                                                                                   |
+| Result is still stacked                       | Make sure you are on v0.2.2+ and have **fully restarted Zotero** — without a restart the old code keeps running                                                                                                               |
+| Formulas collide with translated text         | A layout limitation of the v1 classic pipeline. Install the v2 engine (`uv tool install pdf2zh_next`), then pick "pdf2zh_next" as the engine kind in settings — it is detected automatically and the layout improves markedly |
 
 ## Known limitations
 
@@ -85,7 +88,7 @@ Since v0.2.2 the full pipeline has been verified end-to-end in a real environmen
 - Scanned PDFs only get the OCR-workaround fallback — complex scans are worse than doc2x's cloud OCR
 - No Word/Markdown export yet (a MinerU-based pipeline may be evaluated later)
 - A page costs a few thousand tokens; try a small page range before batch-translating
-- The auto-downloaded engine is the pdf2zh v1 classic pipeline (no watermark, no glossary); for the full feature set install `uv tool install pdf2zh-next` and point the plugin to the v2 engine
+- The auto-downloaded engine is the pdf2zh v1 classic pipeline (no watermark, no glossary); for better formula layout switch to the v2 engine: `uv tool install pdf2zh_next`, then select "pdf2zh_next" as the engine kind in settings (since v0.2.4 the side-by-side layout works on v2 as well)
 
 ## License
 
