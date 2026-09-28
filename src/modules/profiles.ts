@@ -6,6 +6,7 @@ export type PresetServiceId =
   | "qwen"
   | "kimi"
   | "siliconflow"
+  | "mimo"
   | "openai"
   | "gemini"
   | "ollama"
@@ -53,6 +54,15 @@ export const PRESET_SERVICES: Record<PresetServiceId, PresetService> = {
     name: "SiliconFlow 硅基流动",
     baseUrl: "https://api.siliconflow.cn/v1",
     models: ["deepseek-ai/DeepSeek-V3", "Qwen/Qwen2.5-72B-Instruct"],
+  },
+  mimo: {
+    name: "小米 MiMo",
+    // Official OpenAI-compatible endpoint (mimo.mi.com docs), Bearer auth.
+    // v2.5 series is deprecated by upstream as of 2026-10-21, so only the
+    // v2.6 models are offered. flash is the pick for page-by-page
+    // translation (frequent calls, large batches).
+    baseUrl: "https://api.xiaomimimo.com/v1",
+    models: ["mimo-v2.6-flash", "mimo-v2.6-pro"],
   },
   openai: {
     name: "OpenAI",
