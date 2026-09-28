@@ -118,6 +118,50 @@ export async function findManagedEngine(): Promise<EngineInfo | null> {
   return null;
 }
 
+// Locates a pdf2zh_next.exe installed via `uv tool install pdf2zh_next`
+// (no manual browsing needed). The venv's own Scripts dir is preferred
+// over the ~/.local/bin shim; only the pdf2zh_next.exe name counts — the
+// venv also carries a pdf2zh.exe alias that is NOT the v1 engine.
+async function findUvToolEngine(): Promise<EngineInfo | null> {
+  const candidates: string[] = [];
+  const env = (globalThis as any).Services?.env;
+  try {
+    const appData = env?.get?.("APPDATA");
+    if (appData) {
+      for (const name of ["pdf2zh-next", "pdf2zh_next"]) {
+        candidates.push(
+          PathUtils.join(
+            appData,
+            "uv",
+            "tools",
+            name,
+            "Scripts",
+            "pdf2zh_next.exe",
+          ),
+        );
+      }
+    }
+  } catch {
+    // no env access
+  }
+  try {
+    const home = env?.get?.("USERPROFILE");
+    if (home) {
+      candidates.push(PathUtils.join(home, ".local", "bin", "pdf2zh_next.exe"));
+    }
+  } catch {
+    // no env access
+  }
+  for (const p of candidates) {
+    try {
+      if (await IOUtils.exists(p)) return { path: p, kind: "next" };
+    } catch {
+      // unreadable candidate, try the next
+    }
+  }
+  return null;
+}
+
 // Detection scans the whole engine dir (thousands of files inside
 // site-packages) and would otherwise run twice per task. The result is
 // cached until something known to change it happens: browsing/resetting
@@ -131,7 +175,15 @@ export function invalidateEngineCache(): void {
 export async function detectEngine(): Promise<EngineInfo | null> {
   if (engineCache !== undefined) return engineCache;
   const manual = await getManualEngineInfo();
-  const found = manual ?? (await findManagedEngine());
+  let found = manual;
+  if (!found) {
+    // An explicit engineKind selects the engine, not just how a manual
+    // path is interpreted: picking v2 must actually use a v2 engine.
+    if (String(getPref("engineKind") || "auto") === "next") {
+      found = await findUvToolEngine();
+    }
+    if (!found) found = await findManagedEngine();
+  }
   engineCache = found;
   return found;
 }
