@@ -14,3 +14,7 @@ tsconfig.tsbuildinfo
 .scaffold
 build
 logs
+# local tooling & artifacts
+.zcode/
+/full-pdf-translate.xpi
+.tmp*.py
