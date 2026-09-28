@@ -42,15 +42,29 @@ function parseFtl(file) {
 }
 
 const locales = {};
+// getString() resolves ONLY the addon.ftl bundle (see utils/locale.ts:
+// initLocale loads just that file). A key that lives in preferences.ftl
+// is served to the pane via data-l10n-id but is invisible to getString —
+// it renders as the literal key name at runtime.
+const addonOnly = {};
 for (const loc of readdirSync(localeDir)) {
   const dir = join(localeDir, loc);
   if (!statSync(dir).isDirectory()) continue;
   locales[loc] = new Map();
+  addonOnly[loc] = new Map();
   for (const f of walk(dir, [".ftl"])) {
-    for (const [id, attrs] of parseFtl(f)) {
+    const parsed = parseFtl(f);
+    for (const [id, attrs] of parsed) {
       const merged = locales[loc].get(id) ?? new Set();
       for (const a of attrs) merged.add(a);
       locales[loc].set(id, merged);
+    }
+    if (f.endsWith("addon.ftl")) {
+      for (const [id, attrs] of parsed) {
+        const merged = addonOnly[loc].get(id) ?? new Set();
+        for (const a of attrs) merged.add(a);
+        addonOnly[loc].set(id, merged);
+      }
     }
   }
 }
@@ -86,9 +100,13 @@ for (const file of walk(srcDir, [".ts"])) {
     usedIds.add(id);
     const rel = file.slice(root.length + 1);
     for (const loc of localeNames) {
-      const msgs = locales[loc];
+      const msgs = addonOnly[loc];
       if (!msgs.has(id)) {
-        problems.push(`${rel}: getString("${id}") not defined in ${loc}`);
+        problems.push(
+          locales[loc].has(id)
+            ? `${rel}: getString("${id}") — ${loc} defines it only in preferences.ftl, but getString() resolves addon.ftl only (move the message)`
+            : `${rel}: getString("${id}") not defined in ${loc}`,
+        );
         continue;
       }
       if (attr && !msgs.get(id).has(attr)) {
