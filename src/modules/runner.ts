@@ -2,7 +2,7 @@ import { config } from "../../package.json";
 import { getString } from "../utils/locale";
 import { getPref } from "../utils/prefs";
 import { runSubprocess, spawnSubprocess } from "../utils/subprocess";
-import { getActiveProfile } from "./profiles";
+import { getActiveProfile, type ServiceProfile } from "./profiles";
 import { getBundledRuntime, type EngineInfo } from "./engine";
 
 export interface TranslationOutputs {
@@ -21,7 +21,7 @@ function tail(text: string, length: number): string {
   return text.slice(-length);
 }
 
-function lastMeaningfulLine(text: string): string {
+export function lastMeaningfulLine(text: string): string {
   const lines = text
     .replace(/\r\n/g, "\n")
     .replace(/\r/g, "\n")
@@ -32,7 +32,7 @@ function lastMeaningfulLine(text: string): string {
 
 // pdf2zh_next (v2) CLI flags. Secrets travel via PDF2ZH_* env vars only,
 // never the command line.
-function buildNextArgs(inputFile: string, outDir: string): string[] {
+export function buildNextArgs(inputFile: string, outDir: string): string[] {
   const args: string[] = [inputFile, "--output", outDir];
   args.push("--lang-in", String(getPref("langIn") || "en"));
   args.push("--lang-out", String(getPref("langOut") || "zh"));
@@ -68,7 +68,7 @@ function buildNextArgs(inputFile: string, outDir: string): string[] {
 // The classic pipeline is used (no --babeldoc) so output carries no
 // watermark; v1 has no glossary/mono-only/OCR options, so those
 // preferences are ignored for this engine kind.
-async function buildV1Args(
+export async function buildV1Args(
   inputFile: string,
   outDir: string,
   workDir: string,
@@ -126,6 +126,32 @@ export async function runTranslation(opts: {
   const outDir = PathUtils.join(workDir, "out");
   await IOUtils.makeDirectory(outDir, { createAncestors: true });
 
+  try {
+    return await translateWithEngine(
+      engine,
+      inputFile,
+      outDir,
+      workDir,
+      profile,
+      opts.onStatus,
+    );
+  } catch (e) {
+    // This function created the work dir, so it reclaims it on failure —
+    // a failed task must not leave a full copy of the input PDF (plus
+    // engine.log and half-written output) on disk until the next restart.
+    await cleanupWorkDir(workDir);
+    throw e;
+  }
+}
+
+async function translateWithEngine(
+  engine: EngineInfo,
+  inputFile: string,
+  outDir: string,
+  workDir: string,
+  profile: ServiceProfile,
+  onStatus?: (status: string) => void,
+): Promise<TranslationOutputs> {
   const args =
     engine.kind === "next"
       ? buildNextArgs(inputFile, outDir)
@@ -145,11 +171,16 @@ export async function runTranslation(opts: {
           OPENAILIKED_API_KEY: profile.apiKey,
           OPENAILIKED_MODEL: profile.model,
         };
+  // Log a truncated arg summary only: the full table would include the
+  // whole custom prompt.
   Zotero.debug(
-    `[fullpdf] spawn (${engine.kind}): ${engine.path} ${args.join(" ")}`,
+    `[fullpdf] spawn (${engine.kind}): ${engine.path} | ${args.length} args: ${args.join(" ").slice(0, 200)}`,
   );
 
   const engineDir = engine.path.replace(/[\\/][^\\/]+$/, "");
+  const logPath = PathUtils.join(workDir, "engine.log");
+  const outputs: TranslationOutputs = { workDir, logPath };
+  let logTail = "";
   let handle;
   try {
     handle = await spawnSubprocess({
@@ -158,7 +189,15 @@ export async function runTranslation(opts: {
       environment: env,
       workdir: engineDir,
       onStdout: (chunk) => {
-        opts.onStatus?.(lastMeaningfulLine(chunk.replace(ANSI_RE, "")));
+        // Stream the full output to disk as it arrives (engine output
+        // can reach hundreds of MB); memory only keeps a bounded tail
+        // for error reporting.
+        void IOUtils.writeUTF8(logPath, chunk, { mode: "append" }).catch(
+          (e: any) => Zotero.logError(e),
+        );
+        const clean = chunk.replace(ANSI_RE, "");
+        logTail = tail(logTail + clean, 600);
+        onStatus?.(lastMeaningfulLine(clean));
       },
     });
   } catch (e: any) {
@@ -170,20 +209,8 @@ export async function runTranslation(opts: {
   }
   addon.data.currentProc = handle;
 
-  const outputs: TranslationOutputs = { workDir, logPath: "" };
-  let logTail = "";
   const result = await handle.completion;
   addon.data.currentProc = null;
-  // Keep a bounded tail for error reporting; full log goes to disk.
-  try {
-    const logPath = PathUtils.join(workDir, "engine.log");
-    await IOUtils.writeUTF8(logPath, result.stdout);
-    outputs.logPath = logPath;
-    logTail = tail(result.stdout.replace(ANSI_RE, ""), 600);
-  } catch (e: any) {
-    Zotero.logError(e);
-  }
-
   Zotero.debug(`[fullpdf] engine exit ${result.exitCode}`);
   if (result.exitCode !== 0) {
     throw new Error(`engine exit ${result.exitCode}\n${logTail}`);
@@ -203,9 +230,12 @@ export async function runTranslation(opts: {
 
   // doc2x-style side-by-side layout: original page left, translated
   // page right, merged with the engine's bundled PyMuPDF. Falls back
-  // to the stacked dual PDF when unavailable (e.g. v2 engine).
+  // to the stacked dual PDF when unavailable (e.g. v2 engine). Skipped
+  // entirely when output=mono: there is no bilingual attachment to use
+  // it for, so merging would be pure waste.
   const layout = String(getPref("bilingualLayout") || "side");
-  if (layout === "side" && outputs.monoPath) {
+  const output = String(getPref("output") || "dual");
+  if (layout === "side" && output !== "mono" && outputs.monoPath) {
     try {
       const sidePath = await mergeSideBySide(
         engine,

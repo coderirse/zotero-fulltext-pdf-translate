@@ -22,6 +22,11 @@ export interface SubprocessHandle {
 
 type AnyProc = any;
 
+// Engine output can reach hundreds of MB for long documents, so only the
+// last MAX_CAPTURE_CHARS are kept in memory for error reporting. Callers
+// that need the full output should stream it out via onStdout.
+const MAX_CAPTURE_CHARS = 1 << 20;
+
 function loadSubprocess(): AnyProc {
   const ChromeUtils = (globalThis as AnyProc).ChromeUtils;
   return ChromeUtils.importESModule("resource://gre/modules/Subprocess.sys.mjs")
@@ -46,8 +51,11 @@ export async function spawnSubprocess(
     for (;;) {
       const chunk: string = await proc.stdout.readString();
       if (!chunk) break;
-      stdout += chunk;
       opts.onStdout?.(chunk);
+      stdout += chunk;
+      if (stdout.length > MAX_CAPTURE_CHARS) {
+        stdout = stdout.slice(-MAX_CAPTURE_CHARS);
+      }
     }
   })();
   const completion = (async (): Promise<SubprocessResult> => {
