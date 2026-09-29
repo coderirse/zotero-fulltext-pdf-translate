@@ -167,10 +167,26 @@ async function runStartupDiagnostics(): Promise<void> {
     // Deep probe: run one real end-to-end translation so a pipeline
     // failure can be diagnosed from the diagnostics JSON alone. Waits
     // for the queue to drain, then records the resulting attachments.
+    // Every step is traced to <data>/fullpdf-probe-trace.log: a hang
+    // shows exactly which await never returns.
+    const tracePath = PathUtils.join(
+      Zotero.DataDirectory.dir,
+      `${addon.data.config.addonRef}-probe-trace.log`,
+    );
+    const traceLines: string[] = [];
+    const trace = (msg: string) => {
+      traceLines.push(`${new Date().toISOString()} ${msg}`);
+      void Zotero.File.putContentsAsync(
+        tracePath,
+        `${traceLines.join("\n")}\n`,
+      ).catch(() => {});
+    };
     try {
+      trace("probe start");
       const s = new Zotero.Search();
       s.addCondition("title", "contains", "Bio-inspired adhesive joint");
       const ids = await s.search();
+      trace(`search returned ${ids.length} id(s)`);
       const items = Zotero.Items.get(ids).filter((i: any) =>
         i.isRegularItem?.(),
       );
@@ -179,12 +195,15 @@ async function runStartupDiagnostics(): Promise<void> {
         const before = new Set(
           items[0].getAttachments().map((id: number) => String(id)),
         );
+        trace(`before addFromItems (item ${items[0].id})`);
         await translateQueue.addFromItems([items[0]]);
+        trace("addFromItems returned; polling queue");
         // enqueue() returns as soon as tasks are queued; wait for the
         // queue to drain (15 min cap covers the slowest engine runs).
         for (let i = 0; i < 180 && translateQueue.isBusy(); i++) {
           await Zotero.Promise.delay(5000);
         }
+        trace(`queue drained (busy=${translateQueue.isBusy()})`);
         await Zotero.Promise.delay(3000);
         const after = items[0]
           .getAttachments()
@@ -198,6 +217,7 @@ async function runStartupDiagnostics(): Promise<void> {
         });
       }
     } catch (e: any) {
+      trace(`probe fatal: ${e}`);
       result.steps.probeTranslate = {
         ...(result.steps.probeTranslate ?? {}),
         fatal: String(e),
